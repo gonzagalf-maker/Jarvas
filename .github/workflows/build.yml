@@ -39,11 +39,11 @@ jobs:
       - name: Sincronizar aplicativo
         run: npx cap sync android
 
-      - name: Verificar atividade de inicializacao
+      - name: Verificar icones Android
         run: |
-          cat android/app/src/main/AndroidManifest.xml
-          grep -q 'android.intent.action.MAIN' android/app/src/main/AndroidManifest.xml
-          grep -q 'android.intent.category.LAUNCHER' android/app/src/main/AndroidManifest.xml
+          ls -la android/app/src/main/res/mipmap-hdpi
+          ls -la android/app/src/main/res/mipmap-mdpi
+          ls -la android/app/src/main/res/mipmap-xhdpi
 
       - name: Compilar APK
         run: |
