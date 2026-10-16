@@ -1,3 +1,4 @@
+
 name: Compilar Jarvas APK
 
 on:
@@ -28,6 +29,48 @@ jobs:
       - name: Instalar dependencias
         run: npm install
 
+      - name: Criar icone personalizado do Jarvas
+        run: |
+          npm install --no-save @capacitor/assets sharp
+          mkdir -p assets
+
+          node --input-type=module <<'NODE'
+          import sharp from 'sharp';
+
+          const svg = `
+          <svg xmlns="http://www.w3.org/2000/svg"
+               width="1024" height="1024" viewBox="0 0 1024 1024">
+            <defs>
+              <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#10182E"/>
+                <stop offset="100%" stop-color="#183B58"/>
+              </linearGradient>
+              <linearGradient id="logo" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#72FFE0"/>
+                <stop offset="100%" stop-color="#22B8F0"/>
+              </linearGradient>
+            </defs>
+            <rect width="1024" height="1024" rx="220" fill="url(#bg)"/>
+            <circle cx="512" cy="512" r="340"
+                    fill="none" stroke="#31516A" stroke-width="12"/>
+            <path d="M390 315 H650 V570
+                     C650 690 575 740 485 705
+                     C430 685 405 640 405 590"
+                  fill="none" stroke="url(#logo)"
+                  stroke-width="68" stroke-linecap="round"
+                  stroke-linejoin="round"/>
+            <circle cx="650" cy="280" r="30" fill="#FFFFFF"/>
+            <circle cx="650" cy="280" r="54"
+                    fill="none" stroke="#72FFE0" stroke-width="8"
+                    opacity="0.55"/>
+          </svg>`;
+
+          await sharp(Buffer.from(svg))
+            .resize(1024, 1024)
+            .png()
+            .toFile('assets/icon.png');
+          NODE
+
       - name: Preparar arquivos web
         run: |
           mkdir -p www
@@ -36,14 +79,25 @@ jobs:
       - name: Criar projeto Android
         run: npx cap add android
 
+      - name: Gerar icones Android
+        run: |
+          npx @capacitor/assets generate --android \
+            --iconBackgroundColor '#10182E' \
+            --iconBackgroundColorDark '#10182E' \
+            --splashBackgroundColor '#10182E' \
+            --splashBackgroundColorDark '#10182E'
+
       - name: Sincronizar aplicativo
         run: npx cap sync android
 
-      - name: Verificar icones Android
+      - name: Verificar recursos do icone
         run: |
-          ls -la android/app/src/main/res/mipmap-hdpi
-          ls -la android/app/src/main/res/mipmap-mdpi
-          ls -la android/app/src/main/res/mipmap-xhdpi
+          test -f android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          test -f android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          test -f android/app/src/main/AndroidManifest.xml
+          grep -q 'android:icon="@mipmap/ic_launcher"' \
+            android/app/src/main/AndroidManifest.xml
+          echo "Recursos do icone encontrados."
 
       - name: Compilar APK
         run: |
@@ -53,8 +107,14 @@ jobs:
 
       - name: Verificar APK gerado
         run: |
-          AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)
-          "$AAPT" dump badging android/app/build/outputs/apk/debug/app-debug.apk | grep -E "package:|application-label:|launchable-activity:"
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$APK"
+
+          AAPT=$(find "$ANDROID_HOME/build-tools" \
+            -name aapt -type f | sort -V | tail -n 1)
+
+          "$AAPT" dump badging "$APK" |
+            grep -E "package:|application-label:|launchable-activity:"
 
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
