@@ -9,14 +9,18 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - uses: actions/setup-java@v4
+      - name: Configurar Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
@@ -34,6 +38,12 @@ jobs:
 
       - name: Sincronizar aplicativo
         run: npx cap sync android
+
+      - name: Verificar atividade de inicialização
+        run: |
+          cat android/app/src/main/AndroidManifest.xml
+          grep -q 'android.intent.action.MAIN' android/app/src/main/AndroidManifest.xml
+          grep -q 'android.intent.category.LAUNCHER' android/app/src/main/AndroidManifest.xml
 
       - name: Compilar APK
         run: |
