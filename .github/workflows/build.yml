@@ -28,8 +28,9 @@ jobs:
           mkdir -p www
           cp index.html www/index.html
 
-      - name: Criar projeto Android
-        run: npx cap add android
+ - name: Verificar inicialização Android
+    run: |
+      grep -n -A 8 -B 3 'MAIN\|LAUNCHER' android/app/src/main/AndroidManifest.xml
 
       - name: Sincronizar aplicativo
         run: npx cap sync android
