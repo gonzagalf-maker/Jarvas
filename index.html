@@ -1,39 +1,118 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Jarvas</title>
 
-<style>
-*{box-sizing:border-box}
-:root{color-scheme:dark}
-body{margin:0;background:#080d16;color:#e5f3ff;font-family:Arial,sans-serif}
-button,input,select{font:inherit}
-button{padding:10px;background:#19bde5;color:#06131c;border:0;border-radius:8px;font-weight:bold;cursor:pointer}
-button:disabled{opacity:.5}
-header{padding:12px;text-align:center;border-bottom:1px solid #17344a}
-h1{margin:0;color:#42d9ff;letter-spacing:5px}
-header p{margin:5px 0}
-#layout{display:flex;height:calc(100dvh - 79px)}
-#lateral{width:245px;flex-shrink:0;background:#0c1522;border-right:1px solid #17344a;padding:10px;display:flex;flex-direction:column;gap:10px}
-#nova{width:100%}
-#lista{overflow:auto;flex:1}
-.itemConversa{display:flex;gap:5px;margin-bottom:7px}
-.selecionarConversa{flex:1;min-width:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:#122438;color:#e5f3ff;font-weight:normal}
-.selecionarConversa.ativa{border:1px solid #42d9ff;background:#07546b}
-.excluir{padding:8px;background:#40232d;color:#fff}
-#principal{display:flex;flex:1;min-width:0;flex-direction:column}
-#barra{display:flex;align-items:center;gap:7px;padding:8px;border-bottom:1px solid #17344a}
-#menu{display:none}
-#titulo{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;color:#b8d7eb}
-.controle{background:#122438;color:#e5f3ff;border:1px solid #29465b;padding:8px}
-.controle.ativo{background:#07546b;border-color:#42d9ff}
-#status{font-size:12px;color:#8daec4;padding:5px 10px;min-height:24px}
-#chat{flex:1;min-height:0;overflow:auto;padding:12px}
-.msg{padding:12px;margin:10px 0;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere}
-.bot{background:#122438;margin-right:5%}
-.user{background:#07546b;margin-left:8%}
-.msg img{display:block;max-width:100%;max-height:300px;margin-top:8px;border-radius:8px}
-.msgAudio{display:flex;gap:6px;margin-top:9px}
-.msgAudio button{padding:6px 10px}
+function montarTextoPagina(itens) {
+  const preparados = (itens || [])
+    .filter(item => item && typeof item.str === 'string' && item.str.length)
+    .map((item, ordem) => {
+      const t = item.transform || [1, 0, 0, 1, 0, 0];
+
+      return {
+        texto: item.str.replace(/[\t\r\n]+/g, ' '),
+        x: Number(t[4]) || 0,
+        y: Number(t[5]) || 0,
+        largura: Math.max(0, Number(item.width) || 0),
+        fonte: Math.max(
+          1,
+          Math.hypot(Number(t[2]) || 0, Number(t[3]) || 0),
+          Math.hypot(Number(t[0]) || 0, Number(t[1]) || 0)
+        ),
+        ordem
+      };
+    });
+
+  // Ordena aproximadamente de cima para baixo e da esquerda para a direita.
+  preparados.sort((a, b) =>
+    b.y - a.y || a.x - b.x || a.ordem - b.ordem
+  );
+
+  // Agrupa os trechos que pertencem à mesma linha.
+  const linhas = [];
+
+  for (const item of preparados) {
+    let melhorLinha = null;
+    let menorDiferenca = Infinity;
+
+    for (const linha of linhas) {
+      const tolerancia = Math.max(
+        2,
+        Math.min(linha.fonte, item.fonte) * 0.28
+      );
+
+      const diferenca = Math.abs(linha.y - item.y);
+
+      if (
+        diferenca <= tolerancia &&
+        diferenca < menorDiferenca
+      ) {
+        melhorLinha = linha;
+        menorDiferenca = diferenca;
+      }
+    }
+
+    if (!melhorLinha) {
+      melhorLinha = {
+        y: item.y,
+        fonte: item.fonte,
+        itens: []
+      };
+
+      linhas.push(melhorLinha);
+    }
+
+    melhorLinha.itens.push(item);
+
+    melhorLinha.y =
+      melhorLinha.itens.reduce((soma, i) => soma + i.y, 0) /
+      melhorLinha.itens.length;
+
+    melhorLinha.fonte =
+      melhorLinha.itens.reduce((soma, i) => soma + i.fonte, 0) /
+      melhorLinha.itens.length;
+  }
+
+  // Ordena as linhas e os trechos dentro de cada linha.
+  linhas.sort((a, b) => b.y - a.y);
+
+  const resultado = [];
+
+  for (const linha of linhas) {
+    linha.itens.sort((a, b) =>
+      a.x - b.x || a.ordem - b.ordem
+    );
+
+    let textoLinha = '';
+    let anterior = null;
+
+    for (const item of linha.itens) {
+      const atual = item.texto;
+
+      if (anterior) {
+        const fimAnterior = anterior.x + anterior.largura;
+        const distancia = item.x - fimAnterior;
+        const fonte = Math.max(anterior.fonte, item.fonte);
+
+        const comecaPontuacao = /^[,.;:!?%)\]}]/.test(atual.trim());
+        const terminaAbertura = /[(\[{]$/.test(textoLinha.trimEnd());
+
+        if (
+          distancia > fonte * 0.2 &&
+          !comecaPontuacao &&
+          !terminaAbertura &&
+          !/\s$/.test(textoLinha)
+        ) {
+          textoLinha += ' ';
+        }
+      }
+
+      textoLinha += atual;
+      anterior = item;
+    }
+
+    textoLinha = textoLinha.replace(/[ \t]+/g, ' ').trim();
+
+    if (textoLinha) {
+      resultado.push(textoLinha);
+    }
+  }
+
+  return resultado.join('\n');
+}
