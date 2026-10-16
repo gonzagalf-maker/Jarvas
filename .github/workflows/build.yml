@@ -1,54 +1,48 @@
 name: Compilar Jarvas APK
 
 on:
-workflow_dispatch:
-push:
-branches:
-- main
+  workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
-build:
-runs-on: ubuntu-latest
-steps:
-- name: Baixar código
-uses: actions/checkout@v4
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-  - name: Configurar Node.js
-    uses: actions/setup-node@v4
-    with:
-      node-version: 20
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
-  - name: Configurar Java
-    uses: actions/setup-java@v4
-    with:
-      distribution: temurin
-      java-version: 21
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
 
-  - name: Instalar dependências
-    run: npm install
+      - name: Instalar dependências
+        run: npm install
 
-  - name: Preparar arquivos web
-    run: |
-      mkdir -p www
-      cp index.html www/index.html
+      - name: Preparar arquivos web
+        run: |
+          mkdir -p www
+          cp index.html www/index.html
 
-  - name: Criar projeto Android
-    run: npx cap add android
+      - name: Criar projeto Android
+        run: npx cap add android
 
-  - name: Verificar inicialização Android
-    run: grep -n -E 'MAIN|LAUNCHER' android/app/src/main/AndroidManifest.xml
+      - name: Sincronizar aplicativo
+        run: npx cap sync android
 
-  - name: Sincronizar aplicativo
-    run: npx cap sync android
+      - name: Compilar APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
-  - name: Compilar APK
-    run: |
-      cd android
-      chmod +x gradlew
-      ./gradlew assembleDebug
-
-  - name: Disponibilizar APK
-    uses: actions/upload-artifact@v4
-    with:
-      name: Jarvas-APK
-      path: android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Disponibilizar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Jarvas-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
