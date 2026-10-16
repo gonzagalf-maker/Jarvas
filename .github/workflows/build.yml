@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Baixar código
+      - name: Baixar codigo
         uses: actions/checkout@v4
 
       - name: Configurar Node.js
@@ -25,7 +25,7 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Instalar dependências
+      - name: Instalar dependencias
         run: npm install
 
       - name: Preparar arquivos web
@@ -39,7 +39,7 @@ jobs:
       - name: Sincronizar aplicativo
         run: npx cap sync android
 
-      - name: Verificar atividade de inicialização
+      - name: Verificar atividade de inicializacao
         run: |
           cat android/app/src/main/AndroidManifest.xml
           grep -q 'android.intent.action.MAIN' android/app/src/main/AndroidManifest.xml
@@ -50,6 +50,11 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
+
+      - name: Verificar APK gerado
+        run: |
+          AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)
+          "$AAPT" dump badging android/app/build/outputs/apk/debug/app-debug.apk | grep -E "package:|application-label:|launchable-activity:"
 
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
