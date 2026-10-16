@@ -1,96 +1,802 @@
 
-function reconstruirTextoPDF(conteudo){
-  const itens = conteudo.items
-    .filter(item => item.str && item.str.trim())
-    .map(item => ({
-      texto: item.str,
-      x: item.transform[4],
-      y: item.transform[5],
-      largura: item.width || 0,
-      fonte: Math.max(
-        1,
-        Math.hypot(item.transform[0], item.transform[1])
-      ),
-      fimLinha: Boolean(item.hasEOL)
-    }))
-    .sort((a, b) => {
-      // Primeiro, ordenar de cima para baixo.
-      const diferencaY = b.y - a.y;
-      if(Math.abs(diferencaY) > 2) return diferencaY;
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jarvas</title>
 
-      // Na mesma linha, ordenar da esquerda para a direita.
-      return a.x - b.x;
-    });
-
-  const linhas = [];
-
-  for(const item of itens){
-    let linha = linhas.find(l =>
-      Math.abs(l.y - item.y) <=
-      Math.max(2, Math.min(l.fonte, item.fonte) * 0.25)
-    );
-
-    if(!linha){
-      linha = {
-        y: item.y,
-        fonte: item.fonte,
-        itens: []
-      };
-      linhas.push(linha);
-    }
-
-    linha.itens.push(item);
-  }
-
-  linhas.sort((a, b) => b.y - a.y);
-
-  const resultado = [];
-
-  for(const linha of linhas){
-    linha.itens.sort((a, b) => a.x - b.x);
-
-    let textoLinha = '';
-    let anterior = null;
-
-    for(const item of linha.itens){
-      const atual = item.texto.trim();
-
-      if(!atual) continue;
-
-      if(anterior){
-        const fimAnterior = anterior.x + anterior.largura;
-        const distancia = item.x - fimAnterior;
-        const tamanhoFonte = Math.max(
-          anterior.fonte,
-          item.fonte
-        );
-
-        // Distância grande pode indicar outra coluna.
-        if(distancia > tamanhoFonte * 2){
-          textoLinha += '\n';
-        }else if(
-          distancia > tamanhoFonte * 0.22 &&
-          !/\s$/.test(textoLinha) &&
-          !/^[,.;:!?%)\]}]/.test(atual) &&
-          !/[(\[{]$/.test(textoLinha)
-        ){
-          textoLinha += ' ';
-        }
-      }
-
-      textoLinha += atual;
-
-      anterior = item;
-
-      if(item.fimLinha){
-        // A quebra definitiva será aplicada ao terminar a linha.
-      }
-    }
-
-    if(textoLinha.trim()){
-      resultado.push(textoLinha.trim());
-    }
-  }
-
-  return resultado.join('\n');
+<style>
+*{box-sizing:border-box}
+:root{color-scheme:dark}
+body{margin:0;background:#080d16;color:#e5f3ff;font-family:Arial,sans-serif}
+button,input,select{font:inherit}
+button{padding:10px;background:#19bde5;color:#06131c;border:0;border-radius:8px;font-weight:bold;cursor:pointer}
+button:disabled{opacity:.5}
+header{padding:12px;text-align:center;border-bottom:1px solid #17344a}
+h1{margin:0;color:#42d9ff;letter-spacing:5px}
+header p{margin:5px 0}
+#layout{display:flex;height:calc(100dvh - 79px)}
+#lateral{width:245px;flex-shrink:0;background:#0c1522;border-right:1px solid #17344a;padding:10px;display:flex;flex-direction:column;gap:10px}
+#nova{width:100%}
+#lista{overflow:auto;flex:1}
+.itemConversa{display:flex;gap:5px;margin-bottom:7px}
+.selecionarConversa{flex:1;min-width:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:#122438;color:#e5f3ff;font-weight:normal}
+.selecionarConversa.ativa{border:1px solid #42d9ff;background:#07546b}
+.excluir{padding:8px;background:#40232d;color:#fff}
+#principal{display:flex;flex:1;min-width:0;flex-direction:column}
+#barra{display:flex;align-items:center;gap:7px;padding:8px;border-bottom:1px solid #17344a}
+#menu{display:none}
+#titulo{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;color:#b8d7eb}
+.controle{background:#122438;color:#e5f3ff;border:1px solid #29465b;padding:8px}
+.controle.ativo{background:#07546b;border-color:#42d9ff}
+#status{font-size:12px;color:#8daec4;padding:5px 10px;min-height:24px}
+#chat{flex:1;min-height:0;overflow:auto;padding:12px}
+.msg{padding:12px;margin:10px 0;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.bot{background:#122438;margin-right:5%}
+.user{background:#07546b;margin-left:8%}
+.msg img{display:block;max-width:100%;max-height:300px;margin-top:8px;border-radius:8px}
+.msgAudio{display:flex;gap:6px;margin-top:9px}
+.msgAudio button{padding:6px 10px}
+#ferramentas{display:flex;flex-wrap:wrap;gap:7px;padding:8px 10px;border-top:1px solid #17344a}
+#painelPDF{display:none;padding:10px;background:#101e2d;border-top:1px solid #29465b;max-height:35%;overflow:auto}
+#textoPDF{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.5}
+#controlesPDF{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:8px;align-items:center}
+#controlesPDF select{padding:8px;background:#111e2d;color:white;border:1px solid #29465b;border-radius:8px}
+footer{display:flex;gap:7px;padding:10px;border-top:1px solid #17344a}
+#entrada{flex:1;min-width:0;padding:12px;background:#111e2d;color:white;border:1px solid #29465b;border-radius:8px;font-size:16px}
+#arquivoFoto,#arquivoPDF{display:none}
+#selecaoFoto{display:none;padding:10px;background:#111e2d}
+#previa{display:block;max-width:100%;max-height:180px;margin:auto auto 10px}
+.acoesFoto{display:flex;justify-content:center;gap:8px}
+#cancelarFoto{background:#34485a;color:white}
+#avisoVazio{color:#8daec4;text-align:center;padding:30px 12px}
+@media(max-width:600px){
+ #lateral{position:fixed;z-index:5;top:79px;bottom:0;left:0;width:min(290px,85vw);box-shadow:8px 0 25px #0009}
+ #lateral.fechada{display:none}
+ #menu{display:block}
+ #barra{gap:5px}
+ #titulo{font-size:12px}
+ #chat{padding:8px}
+ .msg{padding:10px}
 }
+</style>
+</head>
+
+<body>
+<header>
+  <h1>JARVAS</h1>
+  <p>Assistente pessoal</p>
+</header>
+
+<div id="layout">
+  <aside id="lateral">
+    <button id="nova" type="button">＋ Nova conversa</button>
+    <div id="lista"></div>
+    <button id="limparHistorico" class="controle" type="button">Limpar todas as conversas</button>
+  </aside>
+
+  <main id="principal">
+    <div id="barra">
+      <button id="menu" class="controle" type="button">☰</button>
+      <span id="titulo">Nova conversa</span>
+      <button id="vozAutomatica" class="controle" type="button">🔇 Voz automática</button>
+    </div>
+
+    <div id="status" aria-live="polite">Jarvas pronto.</div>
+    <section id="chat" aria-live="polite"></section>
+
+    <section id="painelPDF">
+      <div id="controlesPDF">
+        <strong id="nomePDF">Documento PDF</strong>
+        <button id="lerPDF" type="button">▶ Ler PDF</button>
+        <button id="pausarPDF" type="button">⏸ Pausar</button>
+        <button id="pararPDF" type="button">⏹ Parar</button>
+        <label for="velocidade">Velocidade</label>
+        <select id="velocidade">
+          <option value="0.7">Lenta</option>
+          <option value="0.9">Normal lenta</option>
+          <option value="1" selected>Normal</option>
+          <option value="1.2">Rápida</option>
+          <option value="1.4">Muito rápida</option>
+        </select>
+        <button id="fecharPDF" class="controle" type="button">Fechar PDF</button>
+      </div>
+      <div id="textoPDF">Selecione um PDF para extrair o texto.</div>
+    </section>
+
+    <section id="selecaoFoto">
+      <p>Conferir foto antes de enviar:</p>
+      <img id="previa" alt="Prévia da foto">
+      <div class="acoesFoto">
+        <button id="cancelarFoto" type="button">Cancelar</button>
+        <button id="enviarFoto" type="button">Enviar foto</button>
+      </div>
+    </section>
+
+    <div id="ferramentas">
+      <button id="fotoBotao" class="controle" type="button">📷 Foto</button>
+      <button id="pdfBotao" class="controle" type="button">📄 Abrir PDF</button>
+      <button id="microfone" class="controle" type="button">🎤 Falar</button>
+      <button id="pararVoz" class="controle" type="button">⏹ Parar voz</button>
+    </div>
+
+    <footer>
+      <input id="entrada" placeholder="Digite ou dite uma mensagem" autocomplete="off">
+      <button id="botaoEnviar" type="button">Enviar</button>
+    </footer>
+  </main>
+</div>
+
+<input id="arquivoFoto" type="file" accept="image/*">
+<input id="arquivoPDF" type="file" accept="application/pdf,.pdf">
+
+<!-- Carrega a ponte compilada para a voz nativa -->
+<script src="./tts.js"></script>
+
+<script>
+'use strict';
+
+const $ = id => document.getElementById(id);
+
+const chat = $('chat');
+const entrada = $('entrada');
+const statusEl = $('status');
+const lista = $('lista');
+const lateral = $('lateral');
+
+const CHAVECONVERSAS = 'jarvas_conversas_v1';
+const CHAVEANTIGA = 'jarvas_mensagens';
+
+let conversas = [];
+let conversaAtual = null;
+let fotoPendente = null;
+let reconhecimento = null;
+let ouvindo = false;
+let falaAutomatica = false;
+
+let textoPDFAtual = '';
+let filaPDF = [];
+let indicePDF = 0;
+let pdfFalando = false;
+let pdfPausado = false;
+let pdfToken = 0;
+let vozToken = 0;
+
+function idNovo(){
+  return Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+}
+
+function definirStatus(texto){
+  statusEl.textContent = texto;
+}
+
+function conversaSelecionada(){
+  return conversas.find(c => c.id === conversaAtual) || null;
+}
+
+function tituloDaConversa(c){
+  const primeira = c.mensagens.find(m => m.eu && m.texto);
+  if(!primeira) return 'Nova conversa';
+  const t = primeira.texto.trim();
+  return t.length > 32 ? t.slice(0,32) + '…' : t;
+}
+
+function salvarConversas(){
+  try{
+    localStorage.setItem(CHAVECONVERSAS, JSON.stringify(conversas));
+    return true;
+  }catch(e){
+    definirStatus('Armazenamento cheio. Algumas alterações podem não ter sido salvas.');
+    return false;
+  }
+}
+
+function carregarConversas(){
+  try{
+    const salvo = JSON.parse(localStorage.getItem(CHAVECONVERSAS) || 'null');
+    if(Array.isArray(salvo)){
+      conversas = salvo.filter(c => c && c.id && Array.isArray(c.mensagens));
+    }
+  }catch(e){
+    conversas = [];
+  }
+
+  if(!conversas.length){
+    try{
+      const antigas = JSON.parse(localStorage.getItem(CHAVEANTIGA) || '[]');
+      if(Array.isArray(antigas) && antigas.length){
+        conversas = [{
+          id:idNovo(),
+          mensagens:antigas,
+          criada:Date.now()
+        }];
+        salvarConversas();
+      }
+    }catch(e){}
+  }
+
+  if(!conversas.length){
+    conversas = [{
+      id:idNovo(),
+      mensagens:[{
+        texto:'Olá! Sou o Jarvas. Minha interface está pronta; minha IA ainda será integrada.',
+        eu:false
+      }],
+      criada:Date.now()
+    }];
+    salvarConversas();
+  }
+
+  conversaAtual = conversas[conversas.length - 1].id;
+}
+
+function renderizarLista(){
+  lista.replaceChildren();
+
+  conversas.slice().reverse().forEach(c => {
+    const linha = document.createElement('div');
+    linha.className = 'itemConversa';
+
+    const selecionar = document.createElement('button');
+    selecionar.type = 'button';
+    selecionar.className = 'selecionarConversa' +
+      (c.id === conversaAtual ? ' ativa' : '');
+    selecionar.textContent = tituloDaConversa(c);
+    selecionar.title = tituloDaConversa(c);
+    selecionar.addEventListener('click', () => abrirConversa(c.id));
+
+    const excluir = document.createElement('button');
+    excluir.type = 'button';
+    excluir.className = 'excluir';
+    excluir.textContent = '×';
+    excluir.title = 'Excluir esta conversa';
+    excluir.setAttribute('aria-label','Excluir ' + tituloDaConversa(c));
+    excluir.addEventListener('click', () => excluirConversa(c.id));
+
+    linha.append(selecionar, excluir);
+    lista.appendChild(linha);
+  });
+}
+
+function renderizarChat(){
+  const c = conversaSelecionada();
+  chat.replaceChildren();
+
+  $('titulo').textContent = c ? tituloDaConversa(c) : 'Nova conversa';
+
+  if(!c || !c.mensagens.length){
+    const vazio = document.createElement('div');
+    vazio.id = 'avisoVazio';
+    vazio.textContent = 'Conversa nova. Escreva uma mensagem para começar.';
+    chat.appendChild(vazio);
+  }else{
+    c.mensagens.forEach(m => mostrar(m));
+  }
+
+  chat.scrollTop = chat.scrollHeight;
+  renderizarLista();
+}
+
+function mostrar(m){
+  const d = document.createElement('div');
+  d.className = 'msg ' + (m.eu ? 'user' : 'bot');
+
+  const texto = document.createElement('div');
+  texto.textContent = (m.eu ? 'Você: ' : 'Jarvas: ') + (m.texto || '');
+  d.appendChild(texto);
+
+  if(m.imagem){
+    const img = document.createElement('img');
+    img.src = m.imagem;
+    img.alt = 'Foto enviada na conversa';
+    img.loading = 'lazy';
+    d.appendChild(img);
+  }
+
+  if(!m.eu && m.texto){
+    const acoes = document.createElement('div');
+    acoes.className = 'msgAudio';
+
+    const ouvir = document.createElement('button');
+    ouvir.type = 'button';
+    ouvir.textContent = '🔊 Ouvir';
+    ouvir.addEventListener('click', () => falar(m.texto));
+
+    acoes.appendChild(ouvir);
+    d.appendChild(acoes);
+  }
+
+  chat.appendChild(d);
+}
+
+function adicionarMensagem(m){
+  const c = conversaSelecionada();
+  if(!c) return;
+
+  c.mensagens.push(m);
+  salvarConversas();
+  renderizarChat();
+}
+
+function abrirConversa(id){
+  if(!conversas.some(c => c.id === id)) return;
+  pararVoz();
+  pararLeituraPDF();
+  conversaAtual = id;
+  renderizarChat();
+  if(window.innerWidth <= 600) lateral.classList.add('fechada');
+}
+
+function novaConversa(){
+  pararVoz();
+  pararLeituraPDF();
+
+  const c = {
+    id:idNovo(),
+    mensagens:[],
+    criada:Date.now()
+  };
+
+  conversas.push(c);
+  conversaAtual = c.id;
+  salvarConversas();
+  renderizarChat();
+  entrada.focus();
+
+  if(window.innerWidth <= 600) lateral.classList.add('fechada');
+}
+
+function excluirConversa(id){
+  const c = conversas.find(x => x.id === id);
+  if(!c) return;
+
+  if(!confirm('Excluir a conversa "' + tituloDaConversa(c) + '"?')) return;
+
+  conversas = conversas.filter(x => x.id !== id);
+
+  if(!conversas.length){
+    conversas.push({id:idNovo(),mensagens:[],criada:Date.now()});
+  }
+
+  if(conversaAtual === id) conversaAtual = conversas[conversas.length - 1].id;
+
+  salvarConversas();
+  renderizarChat();
+  definirStatus('Conversa excluída.');
+}
+
+$('nova').addEventListener('click',novaConversa);
+
+$('limparHistorico').addEventListener('click',() => {
+  if(!confirm('Excluir TODAS as conversas deste aplicativo?')) return;
+
+  conversas = [{id:idNovo(),mensagens:[],criada:Date.now()}];
+  conversaAtual = conversas[0].id;
+  salvarConversas();
+  renderizarChat();
+  definirStatus('Histórico de conversas limpo.');
+});
+
+$('menu').addEventListener('click',() => {
+  lateral.classList.toggle('fechada');
+});
+
+function enviar(){
+  const texto = entrada.value.trim();
+  if(!texto) return;
+
+  adicionarMensagem({texto,eu:true});
+  entrada.value = '';
+
+  const resposta = 'Recebi sua mensagem. A IA local ainda será integrada.';
+  adicionarMensagem({texto:resposta,eu:false});
+
+  if(falaAutomatica) falar(resposta);
+}
+
+$('botaoEnviar').addEventListener('click',enviar);
+entrada.addEventListener('keydown',e => {
+  if(e.key === 'Enter') enviar();
+});
+
+/* SÍNTESE DE VOZ NATIVA DO ANDROID */
+
+async function falar(texto){
+  if(!window.JarvasTTS ||
+     typeof window.JarvasTTS.speak !== 'function'){
+    definirStatus('Integração de voz não carregada. Confira se tts.js está no APK.');
+    return;
+  }
+
+  const token = ++vozToken;
+
+  pararLeituraPDF();
+
+  try{
+    await window.JarvasTTS.stop();
+
+    if(token !== vozToken) return;
+
+    definirStatus('Preparando voz…');
+
+    await window.JarvasTTS.speak(String(texto), 1);
+
+    if(token === vozToken){
+      definirStatus('Jarvas pronto.');
+    }
+  }catch(e){
+    if(token === vozToken){
+      console.error('Erro na síntese de voz:',e);
+      definirStatus('Falha na voz. Confira se há um mecanismo de síntese instalado no Android.');
+    }
+  }
+}
+
+function pararVoz(){
+  vozToken++;
+
+  if(window.JarvasTTS &&
+     typeof window.JarvasTTS.stop === 'function'){
+    window.JarvasTTS.stop().catch(e => {
+      console.warn('Não foi possível parar a voz:',e);
+    });
+  }
+}
+
+$('pararVoz').addEventListener('click',() => {
+  pararVoz();
+  pararLeituraPDF();
+  definirStatus('Reprodução interrompida.');
+});
+
+$('vozAutomatica').addEventListener('click',() => {
+  falaAutomatica = !falaAutomatica;
+
+  try{
+    localStorage.setItem('jarvas_fala_automatica',String(falaAutomatica));
+  }catch(e){}
+
+  $('vozAutomatica').textContent = falaAutomatica
+    ? '🔊 Voz automática'
+    : '🔇 Voz automática';
+
+  $('vozAutomatica').classList.toggle('ativo',falaAutomatica);
+  definirStatus(falaAutomatica ? 'Voz automática ativada.' : 'Voz automática desativada.');
+
+  if(!falaAutomatica) pararVoz();
+});
+
+try{
+  falaAutomatica = localStorage.getItem('jarvas_fala_automatica') === 'true';
+}catch(e){}
+
+$('vozAutomatica').classList.toggle('ativo',falaAutomatica);
+$('vozAutomatica').textContent = falaAutomatica
+  ? '🔊 Voz automática'
+  : '🔇 Voz automática';
+
+function prepararImagem(file){
+  return new Promise((resolve,reject) => {
+    const leitor = new FileReader();
+
+    leitor.onerror = () => reject(new Error('Não foi possível ler a imagem.'));
+
+    leitor.onload = () => {
+      const imagem = new Image();
+
+      imagem.onerror = () => reject(new Error('Não foi possível abrir a imagem.'));
+
+      imagem.onload = () => {
+        const escala = Math.min(1,1000 / Math.max(imagem.width,imagem.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1,Math.round(imagem.width * escala));
+        canvas.height = Math.max(1,Math.round(imagem.height * escala));
+
+        const contexto = canvas.getContext('2d');
+        if(!contexto) return reject(new Error('Falha ao processar imagem.'));
+
+        contexto.drawImage(imagem,0,0,canvas.width,canvas.height);
+        resolve(canvas.toDataURL('image/jpeg',0.72));
+      };
+
+      imagem.src = leitor.result;
+    };
+
+    leitor.readAsDataURL(file);
+  });
+}
+
+$('fotoBotao').addEventListener('click',() => $('arquivoFoto').click());
+
+$('arquivoFoto').addEventListener('change',async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+
+  try{
+    fotoPendente = await prepararImagem(file);
+    $('previa').src = fotoPendente;
+    $('selecaoFoto').style.display = 'block';
+  }catch(err){
+    alert(err.message || 'Erro ao carregar foto.');
+  }
+});
+
+$('cancelarFoto').addEventListener('click',() => {
+  fotoPendente = null;
+  $('previa').removeAttribute('src');
+  $('selecaoFoto').style.display = 'none';
+});
+
+$('enviarFoto').addEventListener('click',() => {
+  if(!fotoPendente) return;
+
+  adicionarMensagem({texto:'Foto enviada',imagem:fotoPendente,eu:true});
+  fotoPendente = null;
+  $('previa').removeAttribute('src');
+  $('selecaoFoto').style.display = 'none';
+
+  const resposta = 'Recebi sua foto. A IA ainda não está integrada para analisá-la.';
+  adicionarMensagem({texto:resposta,eu:false});
+  if(falaAutomatica) falar(resposta);
+});
+
+/* MICROFONE: permanece com a API do navegador por enquanto.
+   A integração nativa do reconhecimento será uma etapa separada. */
+
+function iniciarReconhecimento(){
+  const API = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if(!API){
+    definirStatus('Reconhecimento de fala indisponível neste ambiente.');
+    alert('O reconhecimento de fala não está disponível neste WebView. Precisaremos integrar o microfone nativo do Android.');
+    return;
+  }
+
+  if(ouvindo && reconhecimento){
+    reconhecimento.stop();
+    return;
+  }
+
+  reconhecimento = new API();
+  reconhecimento.lang = 'pt-BR';
+  reconhecimento.continuous = false;
+  reconhecimento.interimResults = true;
+  reconhecimento.maxAlternatives = 1;
+
+  reconhecimento.onstart = () => {
+    ouvindo = true;
+    $('microfone').textContent = '⏹ Parar';
+    $('microfone').classList.add('ativo');
+    definirStatus('Estou ouvindo…');
+  };
+
+  reconhecimento.onresult = event => {
+    let final = '';
+    let parcial = '';
+
+    for(let i = event.resultIndex;i < event.results.length;i++){
+      if(event.results[i].isFinal) final += event.results[i][0].transcript;
+      else parcial += event.results[i][0].transcript;
+    }
+
+    if(final.trim()){
+      entrada.value = (entrada.value + ' ' + final).trim();
+      definirStatus('Texto reconhecido. Confira antes de enviar.');
+    }else if(parcial){
+      definirStatus('Ouvindo: ' + parcial);
+    }
+  };
+
+  reconhecimento.onerror = event => {
+    definirStatus('Erro no microfone: ' + event.error);
+  };
+
+  reconhecimento.onend = () => {
+    ouvindo = false;
+    $('microfone').textContent = '🎤 Falar';
+    $('microfone').classList.remove('ativo');
+    if(!entrada.value.trim()) definirStatus('Jarvas pronto.');
+  };
+
+  try{
+    reconhecimento.start();
+  }catch(e){
+    definirStatus('Não foi possível iniciar o microfone.');
+  }
+}
+
+$('microfone').addEventListener('click',iniciarReconhecimento);
+
+/* PDF.js local */
+
+$('pdfBotao').addEventListener('click',() => $('arquivoPDF').click());
+
+$('arquivoPDF').addEventListener('change',async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+
+  pararVoz();
+  pararLeituraPDF();
+  $('painelPDF').style.display = 'block';
+  $('nomePDF').textContent = file.name;
+  $('textoPDF').textContent = 'Extraindo texto do PDF…';
+  textoPDFAtual = '';
+
+  try{
+    const pdfjs = await import('./pdfjs/pdf.mjs');
+    pdfjs.GlobalWorkerOptions.workerSrc = './pdfjs/pdf.worker.mjs';
+
+    const buffer = await file.arrayBuffer();
+    const pdf = await pdfjs.getDocument({data:new Uint8Array(buffer)}).promise;
+    const paginas = [];
+
+    for(let n = 1;n <= pdf.numPages;n++){
+      definirStatus('Lendo página ' + n + ' de ' + pdf.numPages + '…');
+      const pagina = await pdf.getPage(n);
+      const conteudo = await pagina.getTextContent();
+      const texto = conteudo.items.map(item => item.str || '').join(' ');
+      paginas.push('Página ' + n + '\n' + texto);
+    }
+
+    textoPDFAtual = paginas.join('\n\n').trim();
+
+    if(!textoPDFAtual){
+      $('textoPDF').textContent =
+        'Não encontrei texto selecionável. Este PDF pode ser digitalizado como imagem; será necessário OCR.';
+      definirStatus('PDF sem texto extraível.');
+      return;
+    }
+
+    $('textoPDF').textContent = textoPDFAtual;
+    definirStatus('PDF carregado: ' + pdf.numPages + ' página(s).');
+  }catch(err){
+    console.error(err);
+    $('textoPDF').textContent =
+      'Não foi possível abrir o PDF. Verifique se a biblioteca PDF.js foi incluída no APK e tente novamente.';
+    definirStatus('Falha ao abrir o PDF.');
+  }
+});
+
+function dividirTexto(texto,tamanho=220){
+  const palavras = texto.split(/\s+/);
+  const partes = [];
+  let atual = '';
+
+  for(const palavra of palavras){
+    if((atual + ' ' + palavra).trim().length > tamanho && atual){
+      partes.push(atual);
+      atual = palavra;
+    }else{
+      atual = (atual + ' ' + palavra).trim();
+    }
+  }
+
+  if(atual) partes.push(atual);
+  return partes;
+}
+
+/* Leitura do PDF pela mesma voz nativa */
+
+async function lerProximaParte(token){
+  if(!window.JarvasTTS){
+    pdfFalando = false;
+    definirStatus('Integração de voz não carregada.');
+    return;
+  }
+
+  while(token === pdfToken && pdfFalando && indicePDF < filaPDF.length){
+    if(pdfPausado){
+      await new Promise(resolve => setTimeout(resolve,150));
+      continue;
+    }
+
+    const parte = filaPDF[indicePDF];
+
+    try{
+      await window.JarvasTTS.speak(
+        parte,
+        Number($('velocidade').value)
+      );
+
+      if(token !== pdfToken) return;
+
+      // Se foi pausado durante a fala, repete este trecho ao retomar.
+      if(pdfPausado) continue;
+
+      indicePDF++;
+    }catch(e){
+      if(token !== pdfToken) return;
+
+      // O stop da pausa pode interromper a fala atual.
+      if(pdfPausado) continue;
+
+      console.error('Erro na leitura do PDF:',e);
+      pdfFalando = false;
+      definirStatus('Falha na voz durante a leitura do PDF.');
+      return;
+    }
+  }
+
+  if(token === pdfToken && pdfFalando && indicePDF >= filaPDF.length){
+    pdfFalando = false;
+    definirStatus('Leitura do PDF concluída.');
+  }
+}
+
+$('lerPDF').addEventListener('click',async () => {
+  if(!textoPDFAtual){
+    definirStatus('Abra primeiro um PDF com texto selecionável.');
+    return;
+  }
+
+  if(!window.JarvasTTS){
+    definirStatus('Integração de voz não carregada.');
+    return;
+  }
+
+  pararVoz();
+  pararLeituraPDF();
+
+  filaPDF = dividirTexto(textoPDFAtual);
+  indicePDF = 0;
+  pdfFalando = true;
+  pdfPausado = false;
+  const token = pdfToken;
+
+  definirStatus('Iniciando leitura do PDF…');
+  await lerProximaParte(token);
+});
+
+$('pausarPDF').addEventListener('click',async () => {
+  if(!pdfFalando) return;
+
+  if(!pdfPausado){
+    pdfPausado = true;
+    $('pausarPDF').textContent = '▶ Continuar';
+
+    try{
+      await window.JarvasTTS.stop();
+    }catch(e){}
+
+    definirStatus('Leitura pausada. Toque em Continuar para retomar.');
+  }else{
+    pdfPausado = false;
+    $('pausarPDF').textContent = '⏸ Pausar';
+    definirStatus('Retomando leitura do PDF…');
+  }
+});
+
+function pararLeituraPDF(){
+  pdfToken++;
+  pdfFalando = false;
+  pdfPausado = false;
+  filaPDF = [];
+  indicePDF = 0;
+  $('pausarPDF').textContent = '⏸ Pausar';
+
+  if(window.JarvasTTS){
+    window.JarvasTTS.stop().catch(e => {
+      console.warn('Erro ao interromper PDF:',e);
+    });
+  }
+}
+
+$('pararPDF').addEventListener('click',() => {
+  pararLeituraPDF();
+  definirStatus('Leitura do PDF interrompida.');
+});
+
+$('fecharPDF').addEventListener('click',() => {
+  pararLeituraPDF();
+  $('painelPDF').style.display = 'none';
+});
+
+carregarConversas();
+renderizarChat();
+
+</script>
+</body>
+</html>
