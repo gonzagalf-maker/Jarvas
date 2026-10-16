@@ -1,1 +1,58 @@
-
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jarvas</title>
+<style>
+body{margin:0;background:#080d16;color:#e5f3ff;font-family:Arial}
+header{text-align:center;padding:20px;border-bottom:1px solid #17344a}
+h1{color:#42d9ff;letter-spacing:5px;margin:0}
+#chat{height:70vh;overflow:auto;padding:12px}
+.msg{padding:12px;margin:10px 0;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.bot{background:#122438}
+.user{background:#07546b;margin-left:20%}
+footer{display:flex;gap:8px;padding:10px}
+input{flex:1;min-width:0;padding:12px;background:#111e2d;color:white;border:1px solid #29465b;border-radius:8px}
+button{padding:12px;background:#19bde5;border:0;border-radius:8px}
+</style>
+</head>
+<body>
+<header><h1>JARVAS</h1><p>Assistente pessoal</p></header>
+<main id="chat"></main>
+<footer>
+<input id="entrada" placeholder="Digite uma mensagem">
+<button onclick="enviar()">Enviar</button>
+</footer>
+<script>
+const chat=document.getElementById('chat');
+const entrada=document.getElementById('entrada');
+let mensagens=[];
+try{mensagens=JSON.parse(localStorage.getItem('jarvas_mensagens')||'[]')}catch(e){}
+function mostrar(m){
+ const d=document.createElement('div');
+ d.className='msg '+(m.eu?'user':'bot');
+ d.textContent=(m.eu?'Você: ':'Jarvas: ')+m.texto;
+ chat.appendChild(d);
+}
+mensagens.forEach(mostrar);
+if(!mensagens.length){
+ const m={texto:'Olá! Sou o Jarvas. Minha interface está pronta; minha IA ainda será instalada.',eu:false};
+ mensagens.push(m);mostrar(m);salvar();
+}
+function salvar(){
+ try{localStorage.setItem('jarvas_mensagens',JSON.stringify(mensagens))}
+ catch(e){alert('Não foi possível salvar a memória neste navegador.')}
+}
+function enviar(){
+ const texto=entrada.value.trim();if(!texto)return;
+ const m={texto,eu:true};
+ mensagens.push(m);mostrar(m);salvar();entrada.value='';
+ const r={texto:'Recebi sua mensagem. A IA local será integrada em uma próxima etapa.',eu:false};
+ mensagens.push(r);mostrar(r);salvar();
+ chat.scrollTop=chat.scrollHeight;
+}
+entrada.addEventListener('keydown',e=>{if(e.key==='Enter')enviar()});
+</script>
+</body>
+</html>
