@@ -8,30 +8,58 @@
 
 <style>
 *{box-sizing:border-box}
+:root{color-scheme:dark}
 body{margin:0;background:#080d16;color:#e5f3ff;font-family:Arial,sans-serif}
-header{text-align:center;padding:16px;border-bottom:1px solid #17344a}
-h1{color:#42d9ff;letter-spacing:5px;margin:0}
-header p{margin:8px 0}
-#controles{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;padding:10px}
-.controle{background:#122438;color:#e5f3ff;border:1px solid #29465b;padding:9px 12px}
-.controle.ativo{background:#07546b;border-color:#42d9ff;color:white}
-#status{font-size:12px;color:#8daec4;text-align:center;min-height:16px;margin:0 8px 5px}
-#chat{height:calc(100dvh - 240px);min-height:180px;overflow:auto;padding:12px}
+button,input,select{font:inherit}
+button{padding:10px;background:#19bde5;color:#06131c;border:0;border-radius:8px;font-weight:bold;cursor:pointer}
+button:disabled{opacity:.5}
+header{padding:12px;text-align:center;border-bottom:1px solid #17344a}
+h1{margin:0;color:#42d9ff;letter-spacing:5px}
+header p{margin:5px 0}
+#layout{display:flex;height:calc(100dvh - 79px)}
+#lateral{width:245px;flex-shrink:0;background:#0c1522;border-right:1px solid #17344a;padding:10px;display:flex;flex-direction:column;gap:10px}
+#nova{width:100%}
+#lista{overflow:auto;flex:1}
+.itemConversa{display:flex;gap:5px;margin-bottom:7px}
+.selecionarConversa{flex:1;min-width:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:#122438;color:#e5f3ff;font-weight:normal}
+.selecionarConversa.ativa{border:1px solid #42d9ff;background:#07546b}
+.excluir{padding:8px;background:#40232d;color:#fff}
+#principal{display:flex;flex:1;min-width:0;flex-direction:column}
+#barra{display:flex;align-items:center;gap:7px;padding:8px;border-bottom:1px solid #17344a}
+#menu{display:none}
+#titulo{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;color:#b8d7eb}
+.controle{background:#122438;color:#e5f3ff;border:1px solid #29465b;padding:8px}
+.controle.ativo{background:#07546b;border-color:#42d9ff}
+#status{font-size:12px;color:#8daec4;padding:5px 10px;min-height:24px}
+#chat{flex:1;min-height:0;overflow:auto;padding:12px}
 .msg{padding:12px;margin:10px 0;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere}
-.bot{background:#122438;margin-right:8%}
-.user{background:#07546b;margin-left:12%}
-.msg img{display:block;width:auto;max-width:100%;max-height:350px;margin-top:8px;border-radius:8px}
-.msgAudio{display:flex;justify-content:flex-end;margin-top:8px}
-.msgAudio button{padding:6px 10px;font-size:14px}
-footer{display:flex;gap:7px;padding:10px;border-top:1px solid #17344a;background:#080d16}
+.bot{background:#122438;margin-right:5%}
+.user{background:#07546b;margin-left:8%}
+.msg img{display:block;max-width:100%;max-height:300px;margin-top:8px;border-radius:8px}
+.msgAudio{display:flex;gap:6px;margin-top:9px}
+.msgAudio button{padding:6px 10px}
+#ferramentas{display:flex;flex-wrap:wrap;gap:7px;padding:8px 10px;border-top:1px solid #17344a}
+#painelPDF{display:none;padding:10px;background:#101e2d;border-top:1px solid #29465b;max-height:35%;overflow:auto}
+#textoPDF{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.5}
+#controlesPDF{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:8px;align-items:center}
+#controlesPDF select{padding:8px;background:#111e2d;color:white;border:1px solid #29465b;border-radius:8px}
+footer{display:flex;gap:7px;padding:10px;border-top:1px solid #17344a}
 #entrada{flex:1;min-width:0;padding:12px;background:#111e2d;color:white;border:1px solid #29465b;border-radius:8px;font-size:16px}
-button{padding:11px;background:#19bde5;color:#06131c;border:0;border-radius:8px;font-weight:bold;cursor:pointer}
-#fotoBotao,#microfone{font-size:19px;padding:10px 13px}
-#selecaoFoto{display:none;padding:12px;background:#111e2d}
-#previa{display:block;max-width:100%;max-height:220px;margin:0 auto 12px;border-radius:8px}
-.acoesFoto{display:flex;justify-content:center;gap:10px}
+#arquivoFoto,#arquivoPDF{display:none}
+#selecaoFoto{display:none;padding:10px;background:#111e2d}
+#previa{display:block;max-width:100%;max-height:180px;margin:auto auto 10px}
+.acoesFoto{display:flex;justify-content:center;gap:8px}
 #cancelarFoto{background:#34485a;color:white}
-#arquivoFoto{display:none}
+#avisoVazio{color:#8daec4;text-align:center;padding:30px 12px}
+@media(max-width:600px){
+ #lateral{position:fixed;z-index:5;top:79px;bottom:0;left:0;width:min(290px,85vw);box-shadow:8px 0 25px #0009}
+ #lateral.fechada{display:none}
+ #menu{display:block}
+ #barra{gap:5px}
+ #titulo{font-size:12px}
+ #chat{padding:8px}
+ .msg{padding:10px}
+}
 </style>
 </head>
 
@@ -41,112 +69,212 @@ button{padding:11px;background:#19bde5;color:#06131c;border:0;border-radius:8px;
   <p>Assistente pessoal</p>
 </header>
 
-<section id="controles">
-  <button id="vozAutomatica" class="controle" type="button"
-    aria-pressed="false">🔇 Fala automática: desligada</button>
-  <button id="pararVoz" class="controle" type="button">⏹ Parar voz</button>
-</section>
+<div id="layout">
+  <aside id="lateral">
+    <button id="nova" type="button">＋ Nova conversa</button>
+    <div id="lista"></div>
+    <button id="limparHistorico" class="controle" type="button">Limpar todas as conversas</button>
+  </aside>
 
-<p id="status" aria-live="polite">Jarvas pronto.</p>
-<main id="chat"></main>
+  <main id="principal">
+    <div id="barra">
+      <button id="menu" class="controle" type="button">☰</button>
+      <span id="titulo">Nova conversa</span>
+      <button id="vozAutomatica" class="controle" type="button">🔇 Voz automática</button>
+    </div>
 
-<section id="selecaoFoto">
-  <p>Conferir foto antes de enviar:</p>
-  <img id="previa" alt="Prévia da foto selecionada">
-  <div class="acoesFoto">
-    <button id="cancelarFoto" type="button">Cancelar</button>
-    <button id="enviarFoto" type="button">Enviar foto</button>
-  </div>
-</section>
+    <div id="status" aria-live="polite">Jarvas pronto.</div>
+    <section id="chat" aria-live="polite"></section>
 
-<footer>
-  <button id="fotoBotao" type="button" title="Escolher foto" aria-label="Escolher foto">📷</button>
-  <button id="microfone" type="button" title="Falar" aria-label="Gravar fala">🎤</button>
-  <input id="entrada" placeholder="Digite ou dite uma mensagem" autocomplete="off">
-  <button id="botaoEnviar" type="button">Enviar</button>
-</footer>
+    <section id="painelPDF">
+      <div id="controlesPDF">
+        <strong id="nomePDF">Documento PDF</strong>
+        <button id="lerPDF" type="button">▶ Ler PDF</button>
+        <button id="pausarPDF" type="button">⏸ Pausar</button>
+        <button id="pararPDF" type="button">⏹ Parar</button>
+        <label for="velocidade">Velocidade</label>
+        <select id="velocidade">
+          <option value="0.7">Lenta</option>
+          <option value="0.9">Normal lenta</option>
+          <option value="1" selected>Normal</option>
+          <option value="1.2">Rápida</option>
+          <option value="1.4">Muito rápida</option>
+        </select>
+        <button id="fecharPDF" class="controle" type="button">Fechar PDF</button>
+      </div>
+      <div id="textoPDF">Selecione um PDF para extrair o texto.</div>
+    </section>
+
+    <section id="selecaoFoto">
+      <p>Conferir foto antes de enviar:</p>
+      <img id="previa" alt="Prévia da foto">
+      <div class="acoesFoto">
+        <button id="cancelarFoto" type="button">Cancelar</button>
+        <button id="enviarFoto" type="button">Enviar foto</button>
+      </div>
+    </section>
+
+    <div id="ferramentas">
+      <button id="fotoBotao" class="controle" type="button">📷 Foto</button>
+      <button id="pdfBotao" class="controle" type="button">📄 Abrir PDF</button>
+      <button id="microfone" class="controle" type="button">🎤 Falar</button>
+      <button id="pararVoz" class="controle" type="button">⏹ Parar voz</button>
+    </div>
+
+    <footer>
+      <input id="entrada" placeholder="Digite ou dite uma mensagem" autocomplete="off">
+      <button id="botaoEnviar" type="button">Enviar</button>
+    </footer>
+  </main>
+</div>
 
 <input id="arquivoFoto" type="file" accept="image/*">
+<input id="arquivoPDF" type="file" accept="application/pdf,.pdf">
 
 <script>
-const chat = document.getElementById('chat');
-const entrada = document.getElementById('entrada');
-const arquivoFoto = document.getElementById('arquivoFoto');
-const selecaoFoto = document.getElementById('selecaoFoto');
-const previa = document.getElementById('previa');
-const statusEl = document.getElementById('status');
-const botaoMicrofone = document.getElementById('microfone');
-const botaoVoz = document.getElementById('vozAutomatica');
+'use strict';
 
-let mensagens = [];
+const $ = id => document.getElementById(id);
+
+const chat = $('chat');
+const entrada = $('entrada');
+const statusEl = $('status');
+const lista = $('lista');
+const lateral = $('lateral');
+
+const CHAVECONVERSAS = 'jarvas_conversas_v1';
+const CHAVEANTIGA = 'jarvas_mensagens';
+
+let conversas = [];
+let conversaAtual = null;
 let fotoPendente = null;
 let reconhecimento = null;
 let ouvindo = false;
-let falaAutomatica = localStorage.getItem('jarvas_fala_automatica') === 'true';
+let falaAutomatica = false;
+let textoPDFAtual = '';
+let filaPDF = [];
+let indicePDF = 0;
+let pdfFalando = false;
+let pdfPausado = false;
+let pdfToken = 0;
 
-try {
-  mensagens = JSON.parse(localStorage.getItem('jarvas_mensagens') || '[]');
-  if (!Array.isArray(mensagens)) mensagens = [];
-} catch(e) {
-  mensagens = [];
+function idNovo(){
+  return Date.now().toString(36) + Math.random().toString(36).slice(2,8);
 }
 
-function definirStatus(texto) {
+function definirStatus(texto){
   statusEl.textContent = texto;
 }
 
-function atualizarControleVoz() {
-  botaoVoz.textContent = falaAutomatica
-    ? '🔊 Fala automática: ligada'
-    : '🔇 Fala automática: desligada';
-  botaoVoz.classList.toggle('ativo', falaAutomatica);
-  botaoVoz.setAttribute('aria-pressed', String(falaAutomatica));
+function conversaSelecionada(){
+  return conversas.find(c => c.id === conversaAtual) || null;
 }
 
-function salvar() {
-  try {
-    localStorage.setItem('jarvas_mensagens', JSON.stringify(mensagens));
+function tituloDaConversa(c){
+  const primeira = c.mensagens.find(m => m.eu && m.texto);
+  if(!primeira) return 'Nova conversa';
+  const t = primeira.texto.trim();
+  return t.length > 32 ? t.slice(0,32) + '…' : t;
+}
+
+function salvarConversas(){
+  try{
+    localStorage.setItem(CHAVECONVERSAS, JSON.stringify(conversas));
     return true;
-  } catch(e) {
-    definirStatus('Armazenamento cheio; nem tudo foi salvo.');
+  }catch(e){
+    definirStatus('Armazenamento cheio. Algumas alterações podem não ter sido salvas.');
     return false;
   }
 }
 
-function falar(texto) {
-  if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) {
-    definirStatus('A fala não está disponível neste ambiente.');
-    return;
+function carregarConversas(){
+  try{
+    const salvo = JSON.parse(localStorage.getItem(CHAVECONVERSAS) || 'null');
+    if(Array.isArray(salvo)){
+      conversas = salvo.filter(c => c && c.id && Array.isArray(c.mensagens));
+    }
+  }catch(e){
+    conversas = [];
   }
 
-  window.speechSynthesis.cancel();
+  // Migra o histórico antigo para uma conversa, sem apagar a chave antiga.
+  if(!conversas.length){
+    try{
+      const antigas = JSON.parse(localStorage.getItem(CHAVEANTIGA) || '[]');
+      if(Array.isArray(antigas) && antigas.length){
+        conversas = [{
+          id:idNovo(),
+          mensagens:antigas,
+          criada:Date.now()
+        }];
+        salvarConversas();
+      }
+    }catch(e){}
+  }
 
-  const fala = new SpeechSynthesisUtterance(texto);
-  fala.lang = 'pt-BR';
-  fala.rate = 1;
-  fala.pitch = 1;
+  if(!conversas.length){
+    conversas = [{
+      id:idNovo(),
+      mensagens:[{
+        texto:'Olá! Sou o Jarvas. Minha interface está pronta; minha IA ainda será integrada.',
+        eu:false
+      }],
+      criada:Date.now()
+    }];
+    salvarConversas();
+  }
 
-  fala.onstart = function() {
-    definirStatus('Jarvas está falando...');
-  };
-
-  fala.onend = function() {
-    definirStatus('Jarvas pronto.');
-  };
-
-  fala.onerror = function() {
-    definirStatus('Não foi possível reproduzir a voz.');
-  };
-
-  window.speechSynthesis.speak(fala);
+  conversaAtual = conversas[conversas.length - 1].id;
 }
 
-function pararVoz() {
-  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-  definirStatus('Reprodução interrompida.');
+function renderizarLista(){
+  lista.replaceChildren();
+
+  conversas.slice().reverse().forEach(c => {
+    const linha = document.createElement('div');
+    linha.className = 'itemConversa';
+
+    const selecionar = document.createElement('button');
+    selecionar.type = 'button';
+    selecionar.className = 'selecionarConversa' +
+      (c.id === conversaAtual ? ' ativa' : '');
+    selecionar.textContent = tituloDaConversa(c);
+    selecionar.title = tituloDaConversa(c);
+    selecionar.addEventListener('click', () => abrirConversa(c.id));
+
+    const excluir = document.createElement('button');
+    excluir.type = 'button';
+    excluir.className = 'excluir';
+    excluir.textContent = '×';
+    excluir.title = 'Excluir esta conversa';
+    excluir.setAttribute('aria-label','Excluir ' + tituloDaConversa(c));
+    excluir.addEventListener('click', () => excluirConversa(c.id));
+
+    linha.append(selecionar, excluir);
+    lista.appendChild(linha);
+  });
 }
 
-function mostrar(m) {
+function renderizarChat(){
+  const c = conversaSelecionada();
+  chat.replaceChildren();
+
+  $('titulo').textContent = c ? tituloDaConversa(c) : 'Nova conversa';
+
+  if(!c || !c.mensagens.length){
+    const vazio = document.createElement('div');
+    vazio.id = 'avisoVazio';
+    vazio.textContent = 'Conversa nova. Escreva uma mensagem para começar.';
+    chat.appendChild(vazio);
+  }else{
+    c.mensagens.forEach(m => mostrar(m));
+  }
+
+  chat.scrollTop = chat.scrollHeight;
+  renderizarLista();
+}
+
+function mostrar(m){
   const d = document.createElement('div');
   d.className = 'msg ' + (m.eu ? 'user' : 'bot');
 
@@ -154,7 +282,7 @@ function mostrar(m) {
   texto.textContent = (m.eu ? 'Você: ' : 'Jarvas: ') + (m.texto || '');
   d.appendChild(texto);
 
-  if (m.imagem) {
+  if(m.imagem){
     const img = document.createElement('img');
     img.src = m.imagem;
     img.alt = 'Foto enviada na conversa';
@@ -162,18 +290,14 @@ function mostrar(m) {
     d.appendChild(img);
   }
 
-  if (!m.eu && m.texto) {
+  if(!m.eu && m.texto){
     const acoes = document.createElement('div');
     acoes.className = 'msgAudio';
 
     const ouvir = document.createElement('button');
     ouvir.type = 'button';
     ouvir.textContent = '🔊 Ouvir';
-    ouvir.setAttribute('aria-label', 'Ouvir esta resposta');
-
-    ouvir.addEventListener('click', function() {
-      falar(m.texto);
-    });
+    ouvir.addEventListener('click', () => falar(m.texto));
 
     acoes.appendChild(ouvir);
     d.appendChild(acoes);
@@ -182,106 +306,174 @@ function mostrar(m) {
   chat.appendChild(d);
 }
 
-function atualizarChat() {
-  chat.scrollTop = chat.scrollHeight;
+function adicionarMensagem(m){
+  const c = conversaSelecionada();
+  if(!c) return;
+
+  c.mensagens.push(m);
+  salvarConversas();
+  renderizarChat();
 }
 
-function adicionarMensagem(m) {
-  mensagens.push(m);
-  mostrar(m);
-  const salva = salvar();
-  atualizarChat();
-  return salva;
+function abrirConversa(id){
+  if(!conversas.some(c => c.id === id)) return;
+  pararVoz();
+  pararLeituraPDF();
+  conversaAtual = id;
+  renderizarChat();
+  if(window.innerWidth <= 600) lateral.classList.add('fechada');
 }
 
-function responder(texto) {
-  adicionarMensagem({texto:texto, eu:false});
+function novaConversa(){
+  pararVoz();
+  pararLeituraPDF();
 
-  if (falaAutomatica) falar(texto);
+  const c = {
+    id:idNovo(),
+    mensagens:[],
+    criada:Date.now()
+  };
+
+  conversas.push(c);
+  conversaAtual = c.id;
+  salvarConversas();
+  renderizarChat();
+  entrada.focus();
+
+  if(window.innerWidth <= 600) lateral.classList.add('fechada');
 }
 
-mensagens.forEach(mostrar);
-atualizarControleVoz();
+function excluirConversa(id){
+  const c = conversas.find(x => x.id === id);
+  if(!c) return;
 
-if (!mensagens.length) {
-  adicionarMensagem({
-    texto:'Olá! Sou o Jarvas. Minha interface está pronta; minha IA ainda será instalada.',
-    eu:false
-  });
+  if(!confirm('Excluir a conversa "' + tituloDaConversa(c) + '"?')) return;
+
+  conversas = conversas.filter(x => x.id !== id);
+
+  if(!conversas.length){
+    conversas.push({id:idNovo(),mensagens:[],criada:Date.now()});
+  }
+
+  if(conversaAtual === id) conversaAtual = conversas[conversas.length - 1].id;
+
+  salvarConversas();
+  renderizarChat();
+  definirStatus('Conversa excluída.');
 }
 
-function enviar() {
+$('nova').addEventListener('click',novaConversa);
+
+$('limparHistorico').addEventListener('click',() => {
+  if(!confirm('Excluir TODAS as conversas deste aplicativo?')) return;
+
+  conversas = [{id:idNovo(),mensagens:[],criada:Date.now()}];
+  conversaAtual = conversas[0].id;
+  salvarConversas();
+  renderizarChat();
+  definirStatus('Histórico de conversas limpo.');
+});
+
+$('menu').addEventListener('click',() => {
+  lateral.classList.toggle('fechada');
+});
+
+function enviar(){
   const texto = entrada.value.trim();
-  if (!texto) return;
+  if(!texto) return;
 
-  adicionarMensagem({texto:texto, eu:true});
+  adicionarMensagem({texto,eu:true});
   entrada.value = '';
 
-  responder('Recebi sua mensagem. A IA local será integrada em uma próxima etapa.');
+  // Resposta provisória: ainda não existe IA conectada.
+  const resposta = 'Recebi sua mensagem. A IA local ainda será integrada.';
+  adicionarMensagem({texto:resposta,eu:false});
+
+  if(falaAutomatica) falar(resposta);
 }
 
-document.getElementById('botaoEnviar').addEventListener('click', enviar);
-
-entrada.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') enviar();
+$('botaoEnviar').addEventListener('click',enviar);
+entrada.addEventListener('keydown',e => {
+  if(e.key === 'Enter') enviar();
 });
 
-botaoVoz.addEventListener('click', function() {
+function falar(texto){
+  if(!('speechSynthesis' in window) ||
+     !('SpeechSynthesisUtterance' in window)){
+    definirStatus('A síntese de voz não está disponível neste WebView.');
+    return;
+  }
+
+  pararLeituraPDF();
+  window.speechSynthesis.cancel();
+
+  const fala = new SpeechSynthesisUtterance(texto);
+  fala.lang = 'pt-BR';
+  fala.rate = 1;
+  fala.pitch = 1;
+
+  fala.onstart = () => definirStatus('Reproduzindo voz…');
+  fala.onend = () => definirStatus('Jarvas pronto.');
+  fala.onerror = () => definirStatus('Não foi possível reproduzir a voz.');
+
+  window.speechSynthesis.speak(fala);
+}
+
+function pararVoz(){
+  if('speechSynthesis' in window) window.speechSynthesis.cancel();
+}
+
+$('pararVoz').addEventListener('click',() => {
+  pararVoz();
+  pararLeituraPDF();
+  definirStatus('Reprodução interrompida.');
+});
+
+$('vozAutomatica').addEventListener('click',() => {
   falaAutomatica = !falaAutomatica;
 
-  try {
-    localStorage.setItem('jarvas_fala_automatica', String(falaAutomatica));
-  } catch(e) {}
+  try{
+    localStorage.setItem('jarvas_fala_automatica',String(falaAutomatica));
+  }catch(e){}
 
-  atualizarControleVoz();
-  definirStatus(falaAutomatica
-    ? 'Fala automática ativada.'
-    : 'Fala automática desativada.');
+  $('vozAutomatica').textContent = falaAutomatica
+    ? '🔊 Voz automática'
+    : '🔇 Voz automática';
 
-  if (falaAutomatica) {
-    falar('Fala automática ativada.');
-  } else {
-    pararVoz();
-  }
+  $('vozAutomatica').classList.toggle('ativo',falaAutomatica);
+  definirStatus(falaAutomatica ? 'Voz automática ativada.' : 'Voz automática desativada.');
+
+  if(!falaAutomatica) pararVoz();
 });
 
-document.getElementById('pararVoz').addEventListener('click', pararVoz);
+try{
+  falaAutomatica = localStorage.getItem('jarvas_fala_automatica') === 'true';
+}catch(e){}
 
-document.getElementById('fotoBotao').addEventListener('click', function() {
-  arquivoFoto.click();
-});
+$('vozAutomatica').classList.toggle('ativo',falaAutomatica);
 
-function prepararImagem(file) {
-  return new Promise(function(resolve, reject) {
+function prepararImagem(file){
+  return new Promise((resolve,reject) => {
     const leitor = new FileReader();
 
-    leitor.onerror = function() {
-      reject(new Error('Não foi possível ler a imagem.'));
-    };
+    leitor.onerror = () => reject(new Error('Não foi possível ler a imagem.'));
 
-    leitor.onload = function() {
+    leitor.onload = () => {
       const imagem = new Image();
 
-      imagem.onerror = function() {
-        reject(new Error('Não foi possível abrir a imagem.'));
-      };
+      imagem.onerror = () => reject(new Error('Não foi possível abrir a imagem.'));
 
-      imagem.onload = function() {
-        const escala = Math.min(1, 1000 / Math.max(imagem.width, imagem.height));
-        const largura = Math.max(1, Math.round(imagem.width * escala));
-        const altura = Math.max(1, Math.round(imagem.height * escala));
+      imagem.onload = () => {
+        const escala = Math.min(1,1000 / Math.max(imagem.width,imagem.height));
         const canvas = document.createElement('canvas');
-        canvas.width = largura;
-        canvas.height = altura;
+        canvas.width = Math.max(1,Math.round(imagem.width * escala));
+        canvas.height = Math.max(1,Math.round(imagem.height * escala));
 
         const contexto = canvas.getContext('2d');
-        if (!contexto) {
-          reject(new Error('Não foi possível processar a imagem.'));
-          return;
-        }
+        if(!contexto) return reject(new Error('Falha ao processar imagem.'));
 
-        contexto.drawImage(imagem, 0, 0, largura, altura);
-        resolve(canvas.toDataURL('image/jpeg', 0.75));
+        contexto.drawImage(imagem,0,0,canvas.width,canvas.height);
+        resolve(canvas.toDataURL('image/jpeg',0.72));
       };
 
       imagem.src = leitor.result;
@@ -291,114 +483,273 @@ function prepararImagem(file) {
   });
 }
 
-arquivoFoto.addEventListener('change', async function() {
-  const file = arquivoFoto.files[0];
-  if (!file) return;
+$('fotoBotao').addEventListener('click',() => $('arquivoFoto').click());
 
-  if (!file.type.startsWith('image/')) {
-    alert('Selecione um arquivo de imagem.');
-    arquivoFoto.value = '';
-    return;
-  }
+$('arquivoFoto').addEventListener('change',async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
 
-  try {
+  try{
     fotoPendente = await prepararImagem(file);
-    previa.src = fotoPendente;
-    selecaoFoto.style.display = 'block';
-  } catch(e) {
-    alert(e.message || 'Erro ao carregar a foto.');
+    $('previa').src = fotoPendente;
+    $('selecaoFoto').style.display = 'block';
+  }catch(err){
+    alert(err.message || 'Erro ao carregar foto.');
   }
-
-  arquivoFoto.value = '';
 });
 
-document.getElementById('cancelarFoto').addEventListener('click', function() {
+$('cancelarFoto').addEventListener('click',() => {
   fotoPendente = null;
-  previa.removeAttribute('src');
-  selecaoFoto.style.display = 'none';
+  $('previa').removeAttribute('src');
+  $('selecaoFoto').style.display = 'none';
 });
 
-document.getElementById('enviarFoto').addEventListener('click', function() {
-  if (!fotoPendente) return;
+$('enviarFoto').addEventListener('click',() => {
+  if(!fotoPendente) return;
 
-  adicionarMensagem({
-    texto:'Foto enviada',
-    imagem:fotoPendente,
-    eu:true
-  });
-
+  adicionarMensagem({texto:'Foto enviada',imagem:fotoPendente,eu:true});
   fotoPendente = null;
-  previa.removeAttribute('src');
-  selecaoFoto.style.display = 'none';
+  $('previa').removeAttribute('src');
+  $('selecaoFoto').style.display = 'none';
 
-  responder('Recebi sua foto. Ainda não consigo analisar imagens, pois a IA não foi integrada.');
+  const resposta = 'Recebi sua foto. A IA ainda não está integrada para analisá-la.';
+  adicionarMensagem({texto:resposta,eu:false});
+  if(falaAutomatica) falar(resposta);
 });
 
-function iniciarReconhecimento() {
-  const SpeechRecognition = window.SpeechRecognition ||
-    window.webkitSpeechRecognition;
+function iniciarReconhecimento(){
+  const API = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-  if (!SpeechRecognition) {
-    definirStatus('Reconhecimento de fala indisponível neste ambiente. Podemos integrar o microfone nativo do Android depois.');
-    alert('Este ambiente não oferece reconhecimento de fala pelo navegador. O próximo passo será integrar o microfone nativo do Android.');
+  if(!API){
+    definirStatus('Reconhecimento de fala indisponível neste ambiente.');
+    alert('O reconhecimento de fala não está disponível neste WebView. Precisaremos integrar o microfone nativo do Android.');
     return;
   }
 
-  if (ouvindo && reconhecimento) {
+  if(ouvindo && reconhecimento){
     reconhecimento.stop();
     return;
   }
 
-  reconhecimento = new SpeechRecognition();
+  reconhecimento = new API();
   reconhecimento.lang = 'pt-BR';
   reconhecimento.continuous = false;
   reconhecimento.interimResults = true;
   reconhecimento.maxAlternatives = 1;
 
-  reconhecimento.onstart = function() {
+  reconhecimento.onstart = () => {
     ouvindo = true;
-    botaoMicrofone.classList.add('ativo');
-    botaoMicrofone.textContent = '⏹';
-    definirStatus('Estou ouvindo... fale agora.');
+    $('microfone').textContent = '⏹ Parar';
+    $('microfone').classList.add('ativo');
+    definirStatus('Estou ouvindo…');
   };
 
-  reconhecimento.onresult = function(event) {
-    let textoFinal = '';
-    let textoParcial = '';
+  reconhecimento.onresult = event => {
+    let final = '';
+    let parcial = '';
 
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const resultado = event.results[i];
-      if (resultado.isFinal) textoFinal += resultado[0].transcript;
-      else textoParcial += resultado[0].transcript;
+    for(let i = event.resultIndex;i < event.results.length;i++){
+      if(event.results[i].isFinal) final += event.results[i][0].transcript;
+      else parcial += event.results[i][0].transcript;
     }
 
-    if (textoFinal.trim()) {
-      entrada.value = (entrada.value + ' ' + textoFinal).trim();
-      definirStatus('Fala reconhecida. Confira o texto e toque em Enviar.');
-    } else if (textoParcial) {
-      definirStatus('Entendi parcialmente: ' + textoParcial);
+    if(final.trim()){
+      entrada.value = (entrada.value + ' ' + final).trim();
+      definirStatus('Texto reconhecido. Confira antes de enviar.');
+    }else if(parcial){
+      definirStatus('Ouvindo: ' + parcial);
     }
   };
 
-  reconhecimento.onerror = function(event) {
-    definirStatus('Erro no reconhecimento de fala: ' + event.error);
+  reconhecimento.onerror = event => {
+    definirStatus('Erro no microfone: ' + event.error);
   };
 
-  reconhecimento.onend = function() {
+  reconhecimento.onend = () => {
     ouvindo = false;
-    botaoMicrofone.classList.remove('ativo');
-    botaoMicrofone.textContent = '🎤';
-    if (!entrada.value.trim()) definirStatus('Jarvas pronto.');
+    $('microfone').textContent = '🎤 Falar';
+    $('microfone').classList.remove('ativo');
+    if(!entrada.value.trim()) definirStatus('Jarvas pronto.');
   };
 
-  try {
+  try{
     reconhecimento.start();
-  } catch(e) {
+  }catch(e){
     definirStatus('Não foi possível iniciar o microfone.');
   }
 }
 
-botaoMicrofone.addEventListener('click', iniciarReconhecimento);
+$('microfone').addEventListener('click',iniciarReconhecimento);
+
+// Leitura de PDF usando PDF.js empacotado localmente.
+// Requer pdfjs-dist copiado para www/pdfjs no processo de compilação.
+$('pdfBotao').addEventListener('click',() => $('arquivoPDF').click());
+
+$('arquivoPDF').addEventListener('change',async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+
+  pararVoz();
+  pararLeituraPDF();
+  $('painelPDF').style.display = 'block';
+  $('nomePDF').textContent = file.name;
+  $('textoPDF').textContent = 'Extraindo texto do PDF…';
+  textoPDFAtual = '';
+
+  try{
+    const pdfjs = await import('./pdfjs/pdf.mjs');
+    pdfjs.GlobalWorkerOptions.workerSrc = './pdfjs/pdf.worker.mjs';
+
+    const buffer = await file.arrayBuffer();
+    const pdf = await pdfjs.getDocument({data:new Uint8Array(buffer)}).promise;
+    const paginas = [];
+
+    for(let n = 1;n <= pdf.numPages;n++){
+      definirStatus('Lendo página ' + n + ' de ' + pdf.numPages + '…');
+      const pagina = await pdf.getPage(n);
+      const conteudo = await pagina.getTextContent();
+      const texto = conteudo.items.map(item => item.str || '').join(' ');
+      paginas.push('Página ' + n + '\n' + texto);
+    }
+
+    textoPDFAtual = paginas.join('\n\n').trim();
+
+    if(!textoPDFAtual){
+      $('textoPDF').textContent =
+        'Não encontrei texto selecionável. Este PDF pode ser digitalizado como imagem; será necessário OCR.';
+      definirStatus('PDF sem texto extraível.');
+      return;
+    }
+
+    $('textoPDF').textContent = textoPDFAtual;
+    definirStatus('PDF carregado: ' + pdf.numPages + ' página(s).');
+  }catch(err){
+    console.error(err);
+    $('textoPDF').textContent =
+      'Não foi possível abrir o PDF. Verifique se a biblioteca PDF.js foi incluída no APK e tente novamente.';
+    definirStatus('Falha ao abrir o PDF.');
+  }
+});
+
+function dividirTexto(texto,tamanho=220){
+  const palavras = texto.split(/\s+/);
+  const partes = [];
+  let atual = '';
+
+  for(const palavra of palavras){
+    if((atual + ' ' + palavra).trim().length > tamanho && atual){
+      partes.push(atual);
+      atual = palavra;
+    }else{
+      atual = (atual + ' ' + palavra).trim();
+    }
+  }
+
+  if(atual) partes.push(atual);
+  return partes;
+}
+
+function lerProximaParte(token){
+  if(token !== pdfToken || pdfPausado) return;
+
+  if(indicePDF >= filaPDF.length){
+    pdfFalando = false;
+    definirStatus('Leitura do PDF concluída.');
+    return;
+  }
+
+  const fala = new SpeechSynthesisUtterance(filaPDF[indicePDF]);
+  fala.lang = 'pt-BR';
+  fala.rate = Number($('velocidade').value);
+  fala.pitch = 1;
+
+  fala.onend = () => {
+    if(token !== pdfToken || pdfPausado) return;
+    indicePDF++;
+    lerProximaParte(token);
+  };
+
+  fala.onerror = () => {
+    if(token !== pdfToken) return;
+    pdfFalando = false;
+    definirStatus('A voz parou ou não está disponível.');
+  };
+
+  window.speechSynthesis.speak(fala);
+}
+
+$('lerPDF').addEventListener('click',() => {
+  if(!textoPDFAtual){
+    definirStatus('Abra primeiro um PDF com texto selecionável.');
+    return;
+  }
+
+  if(!('speechSynthesis' in window)){
+    definirStatus('Síntese de voz indisponível neste WebView.');
+    return;
+  }
+
+  pararVoz();
+  pararLeituraPDF();
+
+  filaPDF = dividirTexto(textoPDFAtual);
+  indicePDF = 0;
+  pdfFalando = true;
+  pdfPausado = false;
+  const token = pdfToken;
+
+  definirStatus('Iniciando leitura do PDF…');
+  lerProximaParte(token);
+});
+
+$('pausarPDF').addEventListener('click',() => {
+  if(!pdfFalando) return;
+
+  if(!pdfPausado){
+    pdfPausado = true;
+    if(window.speechSynthesis) window.speechSynthesis.pause();
+    definirStatus('Leitura pausada. Toque em Continuar para retomar.');
+    $('pausarPDF').textContent = '▶ Continuar';
+  }else{
+    pdfPausado = false;
+    $('pausarPDF').textContent = '⏸ Pausar';
+
+    if(window.speechSynthesis && window.speechSynthesis.paused){
+      window.speechSynthesis.resume();
+    }else{
+      lerProximaParte(pdfToken);
+    }
+
+    definirStatus('Leitura retomada.');
+  }
+});
+
+function pararLeituraPDF(){
+  pdfToken++;
+  pdfFalando = false;
+  pdfPausado = false;
+  filaPDF = [];
+  indicePDF = 0;
+
+  if(window.speechSynthesis) window.speechSynthesis.cancel();
+  $('pausarPDF').textContent = '⏸ Pausar';
+}
+
+$('pararPDF').addEventListener('click',() => {
+  pararLeituraPDF();
+  definirStatus('Leitura do PDF interrompida.');
+});
+
+$('fecharPDF').addEventListener('click',() => {
+  pararLeituraPDF();
+  $('painelPDF').style.display = 'none';
+});
+
+carregarConversas();
+renderizarChat();
+
 </script>
 </body>
 </html>
