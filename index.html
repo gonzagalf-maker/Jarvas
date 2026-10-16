@@ -1,58 +1,366 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Jarvas</title>
+
 <style>
-body{margin:0;background:#080d16;color:#e5f3ff;font-family:Arial}
-header{text-align:center;padding:20px;border-bottom:1px solid #17344a}
-h1{color:#42d9ff;letter-spacing:5px;margin:0}
-#chat{height:70vh;overflow:auto;padding:12px}
-.msg{padding:12px;margin:10px 0;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:#080d16;
+  color:#e5f3ff;
+  font-family:Arial,sans-serif;
+}
+header{
+  text-align:center;
+  padding:20px;
+  border-bottom:1px solid #17344a;
+}
+h1{
+  color:#42d9ff;
+  letter-spacing:5px;
+  margin:0;
+}
+header p{margin-bottom:0}
+#chat{
+  height:calc(100dvh - 185px);
+  min-height:200px;
+  overflow:auto;
+  padding:12px;
+}
+.msg{
+  padding:12px;
+  margin:10px 0;
+  border-radius:12px;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+}
 .bot{background:#122438}
-.user{background:#07546b;margin-left:20%}
-footer{display:flex;gap:8px;padding:10px}
-input{flex:1;min-width:0;padding:12px;background:#111e2d;color:white;border:1px solid #29465b;border-radius:8px}
-button{padding:12px;background:#19bde5;border:0;border-radius:8px}
+.user{
+  background:#07546b;
+  margin-left:15%;
+}
+.msg img{
+  display:block;
+  width:auto;
+  max-width:100%;
+  max-height:350px;
+  margin-top:8px;
+  border-radius:8px;
+}
+footer{
+  display:flex;
+  gap:8px;
+  padding:10px;
+  padding-bottom:max(10px,env(safe-area-inset-bottom));
+  border-top:1px solid #17344a;
+  background:#080d16;
+}
+#entrada{
+  flex:1;
+  min-width:0;
+  padding:12px;
+  background:#111e2d;
+  color:white;
+  border:1px solid #29465b;
+  border-radius:8px;
+  font-size:16px;
+}
+button{
+  padding:12px;
+  background:#19bde5;
+  color:#06131c;
+  border:0;
+  border-radius:8px;
+  font-weight:bold;
+  cursor:pointer;
+}
+#fotoBotao{
+  font-size:20px;
+  padding:10px 14px;
+}
+#selecaoFoto{
+  display:none;
+  padding:12px;
+  border-top:1px solid #29465b;
+  background:#111e2d;
+}
+#previa{
+  display:block;
+  max-width:100%;
+  max-height:220px;
+  margin:0 auto 12px;
+  border-radius:8px;
+}
+.acoesFoto{
+  display:flex;
+  justify-content:center;
+  gap:10px;
+}
+#cancelarFoto{background:#34485a;color:white}
+#arquivoFoto{display:none}
 </style>
 </head>
+
 <body>
-<header><h1>JARVAS</h1><p>Assistente pessoal</p></header>
+
+<header>
+  <h1>JARVAS</h1>
+  <p>Assistente pessoal</p>
+</header>
+
 <main id="chat"></main>
+
+<section id="selecaoFoto">
+  <p>Conferir foto antes de enviar:</p>
+  <img id="previa" alt="Prévia da foto selecionada">
+  <div class="acoesFoto">
+    <button id="cancelarFoto" type="button">Cancelar</button>
+    <button id="enviarFoto" type="button">Enviar foto</button>
+  </div>
+</section>
+
 <footer>
-<input id="entrada" placeholder="Digite uma mensagem">
-<button onclick="enviar()">Enviar</button>
+  <button id="fotoBotao" type="button"
+          aria-label="Escolher foto" title="Escolher foto">📷</button>
+  <input id="entrada" placeholder="Digite uma mensagem"
+         autocomplete="off">
+  <button id="botaoEnviar" type="button">Enviar</button>
 </footer>
+
+<input id="arquivoFoto" type="file" accept="image/*">
+
 <script>
-const chat=document.getElementById('chat');
-const entrada=document.getElementById('entrada');
-let mensagens=[];
-try{mensagens=JSON.parse(localStorage.getItem('jarvas_mensagens')||'[]')}catch(e){}
-function mostrar(m){
- const d=document.createElement('div');
- d.className='msg '+(m.eu?'user':'bot');
- d.textContent=(m.eu?'Você: ':'Jarvas: ')+m.texto;
- chat.appendChild(d);
+const chat = document.getElementById('chat');
+const entrada = document.getElementById('entrada');
+const arquivoFoto = document.getElementById('arquivoFoto');
+const selecaoFoto = document.getElementById('selecaoFoto');
+const previa = document.getElementById('previa');
+
+let mensagens = [];
+let fotoPendente = null;
+
+try {
+  mensagens = JSON.parse(
+    localStorage.getItem('jarvas_mensagens') || '[]'
+  );
+
+  if (!Array.isArray(mensagens)) mensagens = [];
+} catch(e) {
+  mensagens = [];
 }
+
+function salvar() {
+  try {
+    localStorage.setItem(
+      'jarvas_mensagens',
+      JSON.stringify(mensagens)
+    );
+    return true;
+  } catch(e) {
+    alert(
+      'O armazenamento está cheio. A mensagem ou foto pode não ' +
+      'ficar salva depois que o aplicativo for fechado. ' +
+      'Tente remover algumas fotos antigas.'
+    );
+    return false;
+  }
+}
+
+function mostrar(m) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + (m.eu ? 'user' : 'bot');
+
+  const texto = document.createElement('div');
+  texto.textContent = (m.eu ? 'Você: ' : 'Jarvas: ') +
+    (m.texto || '');
+  d.appendChild(texto);
+
+  if (m.imagem) {
+    const img = document.createElement('img');
+    img.src = m.imagem;
+    img.alt = 'Foto enviada na conversa';
+    img.loading = 'lazy';
+    d.appendChild(img);
+  }
+
+  chat.appendChild(d);
+}
+
+function atualizarChat() {
+  chat.scrollTop = chat.scrollHeight;
+}
+
 mensagens.forEach(mostrar);
-if(!mensagens.length){
- const m={texto:'Olá! Sou o Jarvas. Minha interface está pronta; minha IA ainda será instalada.',eu:false};
- mensagens.push(m);mostrar(m);salvar();
+
+if (!mensagens.length) {
+  const m = {
+    texto: 'Olá! Sou o Jarvas. Minha interface está pronta; ' +
+      'minha IA ainda será instalada.',
+    eu: false
+  };
+  mensagens.push(m);
+  mostrar(m);
+  salvar();
 }
-function salvar(){
- try{localStorage.setItem('jarvas_mensagens',JSON.stringify(mensagens))}
- catch(e){alert('Não foi possível salvar a memória neste navegador.')}
+
+function responder(texto) {
+  const r = {
+    texto: texto,
+    eu: false
+  };
+
+  mensagens.push(r);
+  mostrar(r);
+  salvar();
+  atualizarChat();
 }
-function enviar(){
- const texto=entrada.value.trim();if(!texto)return;
- const m={texto,eu:true};
- mensagens.push(m);mostrar(m);salvar();entrada.value='';
- const r={texto:'Recebi sua mensagem. A IA local será integrada em uma próxima etapa.',eu:false};
- mensagens.push(r);mostrar(r);salvar();
- chat.scrollTop=chat.scrollHeight;
+
+function enviar() {
+  const texto = entrada.value.trim();
+  if (!texto) return;
+
+  const m = {
+    texto: texto,
+    eu: true
+  };
+
+  mensagens.push(m);
+  mostrar(m);
+  salvar();
+
+  entrada.value = '';
+
+  responder(
+    'Recebi sua mensagem. A IA local será integrada em uma próxima etapa.'
+  );
 }
-entrada.addEventListener('keydown',e=>{if(e.key==='Enter')enviar()});
+
+document.getElementById('botaoEnviar')
+  .addEventListener('click', enviar);
+
+entrada.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') enviar();
+});
+
+document.getElementById('fotoBotao')
+  .addEventListener('click', function() {
+    arquivoFoto.click();
+  });
+
+function prepararImagem(file) {
+  return new Promise(function(resolve, reject) {
+    const leitor = new FileReader();
+
+    leitor.onerror = function() {
+      reject(new Error('Não foi possível ler a imagem.'));
+    };
+
+    leitor.onload = function() {
+      const imagem = new Image();
+
+      imagem.onerror = function() {
+        reject(new Error('Não foi possível abrir a imagem.'));
+      };
+
+      imagem.onload = function() {
+        const limite = 1000;
+        const escala = Math.min(
+          1,
+          limite / Math.max(imagem.width, imagem.height)
+        );
+
+        const largura = Math.max(
+          1, Math.round(imagem.width * escala)
+        );
+        const altura = Math.max(
+          1, Math.round(imagem.height * escala)
+        );
+
+        const canvas = document.createElement('canvas');
+        canvas.width = largura;
+        canvas.height = altura;
+
+        const contexto = canvas.getContext('2d');
+
+        if (!contexto) {
+          reject(new Error('Não foi possível processar a imagem.'));
+          return;
+        }
+
+        contexto.drawImage(imagem, 0, 0, largura, altura);
+
+        resolve(canvas.toDataURL('image/jpeg', 0.75));
+      };
+
+      imagem.src = leitor.result;
+    };
+
+    leitor.readAsDataURL(file);
+  });
+}
+
+arquivoFoto.addEventListener('change', async function() {
+  const file = arquivoFoto.files[0];
+  if (!file) return;
+
+  if (!file.type.startsWith('image/')) {
+    alert('Selecione um arquivo de imagem.');
+    arquivoFoto.value = '';
+    return;
+  }
+
+  try {
+    fotoPendente = await prepararImagem(file);
+    previa.src = fotoPendente;
+    selecaoFoto.style.display = 'block';
+  } catch(e) {
+    alert(e.message || 'Erro ao carregar a foto.');
+    fotoPendente = null;
+  }
+
+  arquivoFoto.value = '';
+});
+
+document.getElementById('cancelarFoto')
+  .addEventListener('click', function() {
+    fotoPendente = null;
+    previa.removeAttribute('src');
+    selecaoFoto.style.display = 'none';
+  });
+
+document.getElementById('enviarFoto')
+  .addEventListener('click', function() {
+    if (!fotoPendente) return;
+
+    const m = {
+      texto: 'Foto enviada',
+      imagem: fotoPendente,
+      eu: true
+    };
+
+    mensagens.push(m);
+    mostrar(m);
+
+    const salva = salvar();
+
+    fotoPendente = null;
+    previa.removeAttribute('src');
+    selecaoFoto.style.display = 'none';
+    atualizarChat();
+
+    responder(
+      salva
+        ? 'Recebi sua foto. Ainda não consigo analisar imagens, ' +
+          'pois a IA não foi integrada.'
+        : 'A foto foi exibida, mas não consegui garantir que ela ' +
+          'ficou salva no histórico.'
+    );
+  });
 </script>
+
 </body>
 </html>
