@@ -8,110 +8,46 @@
 
 <style>
 *{box-sizing:border-box}
-body{
-  margin:0;
-  background:#080d16;
-  color:#e5f3ff;
-  font-family:Arial,sans-serif;
-}
-header{
-  text-align:center;
-  padding:20px;
-  border-bottom:1px solid #17344a;
-}
-h1{
-  color:#42d9ff;
-  letter-spacing:5px;
-  margin:0;
-}
-header p{margin-bottom:0}
-#chat{
-  height:calc(100dvh - 185px);
-  min-height:200px;
-  overflow:auto;
-  padding:12px;
-}
-.msg{
-  padding:12px;
-  margin:10px 0;
-  border-radius:12px;
-  white-space:pre-wrap;
-  overflow-wrap:anywhere;
-}
-.bot{background:#122438}
-.user{
-  background:#07546b;
-  margin-left:15%;
-}
-.msg img{
-  display:block;
-  width:auto;
-  max-width:100%;
-  max-height:350px;
-  margin-top:8px;
-  border-radius:8px;
-}
-footer{
-  display:flex;
-  gap:8px;
-  padding:10px;
-  padding-bottom:max(10px,env(safe-area-inset-bottom));
-  border-top:1px solid #17344a;
-  background:#080d16;
-}
-#entrada{
-  flex:1;
-  min-width:0;
-  padding:12px;
-  background:#111e2d;
-  color:white;
-  border:1px solid #29465b;
-  border-radius:8px;
-  font-size:16px;
-}
-button{
-  padding:12px;
-  background:#19bde5;
-  color:#06131c;
-  border:0;
-  border-radius:8px;
-  font-weight:bold;
-  cursor:pointer;
-}
-#fotoBotao{
-  font-size:20px;
-  padding:10px 14px;
-}
-#selecaoFoto{
-  display:none;
-  padding:12px;
-  border-top:1px solid #29465b;
-  background:#111e2d;
-}
-#previa{
-  display:block;
-  max-width:100%;
-  max-height:220px;
-  margin:0 auto 12px;
-  border-radius:8px;
-}
-.acoesFoto{
-  display:flex;
-  justify-content:center;
-  gap:10px;
-}
+body{margin:0;background:#080d16;color:#e5f3ff;font-family:Arial,sans-serif}
+header{text-align:center;padding:16px;border-bottom:1px solid #17344a}
+h1{color:#42d9ff;letter-spacing:5px;margin:0}
+header p{margin:8px 0}
+#controles{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;padding:10px}
+.controle{background:#122438;color:#e5f3ff;border:1px solid #29465b;padding:9px 12px}
+.controle.ativo{background:#07546b;border-color:#42d9ff;color:white}
+#status{font-size:12px;color:#8daec4;text-align:center;min-height:16px;margin:0 8px 5px}
+#chat{height:calc(100dvh - 240px);min-height:180px;overflow:auto;padding:12px}
+.msg{padding:12px;margin:10px 0;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.bot{background:#122438;margin-right:8%}
+.user{background:#07546b;margin-left:12%}
+.msg img{display:block;width:auto;max-width:100%;max-height:350px;margin-top:8px;border-radius:8px}
+.msgAudio{display:flex;justify-content:flex-end;margin-top:8px}
+.msgAudio button{padding:6px 10px;font-size:14px}
+footer{display:flex;gap:7px;padding:10px;border-top:1px solid #17344a;background:#080d16}
+#entrada{flex:1;min-width:0;padding:12px;background:#111e2d;color:white;border:1px solid #29465b;border-radius:8px;font-size:16px}
+button{padding:11px;background:#19bde5;color:#06131c;border:0;border-radius:8px;font-weight:bold;cursor:pointer}
+#fotoBotao,#microfone{font-size:19px;padding:10px 13px}
+#selecaoFoto{display:none;padding:12px;background:#111e2d}
+#previa{display:block;max-width:100%;max-height:220px;margin:0 auto 12px;border-radius:8px}
+.acoesFoto{display:flex;justify-content:center;gap:10px}
 #cancelarFoto{background:#34485a;color:white}
 #arquivoFoto{display:none}
 </style>
 </head>
 
 <body>
-
 <header>
   <h1>JARVAS</h1>
   <p>Assistente pessoal</p>
 </header>
 
+<section id="controles">
+  <button id="vozAutomatica" class="controle" type="button"
+    aria-pressed="false">🔇 Fala automática: desligada</button>
+  <button id="pararVoz" class="controle" type="button">⏹ Parar voz</button>
+</section>
+
+<p id="status" aria-live="polite">Jarvas pronto.</p>
 <main id="chat"></main>
 
 <section id="selecaoFoto">
@@ -124,10 +60,9 @@ button{
 </section>
 
 <footer>
-  <button id="fotoBotao" type="button"
-          aria-label="Escolher foto" title="Escolher foto">📷</button>
-  <input id="entrada" placeholder="Digite uma mensagem"
-         autocomplete="off">
+  <button id="fotoBotao" type="button" title="Escolher foto" aria-label="Escolher foto">📷</button>
+  <button id="microfone" type="button" title="Falar" aria-label="Gravar fala">🎤</button>
+  <input id="entrada" placeholder="Digite ou dite uma mensagem" autocomplete="off">
   <button id="botaoEnviar" type="button">Enviar</button>
 </footer>
 
@@ -139,35 +74,76 @@ const entrada = document.getElementById('entrada');
 const arquivoFoto = document.getElementById('arquivoFoto');
 const selecaoFoto = document.getElementById('selecaoFoto');
 const previa = document.getElementById('previa');
+const statusEl = document.getElementById('status');
+const botaoMicrofone = document.getElementById('microfone');
+const botaoVoz = document.getElementById('vozAutomatica');
 
 let mensagens = [];
 let fotoPendente = null;
+let reconhecimento = null;
+let ouvindo = false;
+let falaAutomatica = localStorage.getItem('jarvas_fala_automatica') === 'true';
 
 try {
-  mensagens = JSON.parse(
-    localStorage.getItem('jarvas_mensagens') || '[]'
-  );
-
+  mensagens = JSON.parse(localStorage.getItem('jarvas_mensagens') || '[]');
   if (!Array.isArray(mensagens)) mensagens = [];
 } catch(e) {
   mensagens = [];
 }
 
+function definirStatus(texto) {
+  statusEl.textContent = texto;
+}
+
+function atualizarControleVoz() {
+  botaoVoz.textContent = falaAutomatica
+    ? '🔊 Fala automática: ligada'
+    : '🔇 Fala automática: desligada';
+  botaoVoz.classList.toggle('ativo', falaAutomatica);
+  botaoVoz.setAttribute('aria-pressed', String(falaAutomatica));
+}
+
 function salvar() {
   try {
-    localStorage.setItem(
-      'jarvas_mensagens',
-      JSON.stringify(mensagens)
-    );
+    localStorage.setItem('jarvas_mensagens', JSON.stringify(mensagens));
     return true;
   } catch(e) {
-    alert(
-      'O armazenamento está cheio. A mensagem ou foto pode não ' +
-      'ficar salva depois que o aplicativo for fechado. ' +
-      'Tente remover algumas fotos antigas.'
-    );
+    definirStatus('Armazenamento cheio; nem tudo foi salvo.');
     return false;
   }
+}
+
+function falar(texto) {
+  if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) {
+    definirStatus('A fala não está disponível neste ambiente.');
+    return;
+  }
+
+  window.speechSynthesis.cancel();
+
+  const fala = new SpeechSynthesisUtterance(texto);
+  fala.lang = 'pt-BR';
+  fala.rate = 1;
+  fala.pitch = 1;
+
+  fala.onstart = function() {
+    definirStatus('Jarvas está falando...');
+  };
+
+  fala.onend = function() {
+    definirStatus('Jarvas pronto.');
+  };
+
+  fala.onerror = function() {
+    definirStatus('Não foi possível reproduzir a voz.');
+  };
+
+  window.speechSynthesis.speak(fala);
+}
+
+function pararVoz() {
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  definirStatus('Reprodução interrompida.');
 }
 
 function mostrar(m) {
@@ -175,8 +151,7 @@ function mostrar(m) {
   d.className = 'msg ' + (m.eu ? 'user' : 'bot');
 
   const texto = document.createElement('div');
-  texto.textContent = (m.eu ? 'Você: ' : 'Jarvas: ') +
-    (m.texto || '');
+  texto.textContent = (m.eu ? 'Você: ' : 'Jarvas: ') + (m.texto || '');
   d.appendChild(texto);
 
   if (m.imagem) {
@@ -187,6 +162,23 @@ function mostrar(m) {
     d.appendChild(img);
   }
 
+  if (!m.eu && m.texto) {
+    const acoes = document.createElement('div');
+    acoes.className = 'msgAudio';
+
+    const ouvir = document.createElement('button');
+    ouvir.type = 'button';
+    ouvir.textContent = '🔊 Ouvir';
+    ouvir.setAttribute('aria-label', 'Ouvir esta resposta');
+
+    ouvir.addEventListener('click', function() {
+      falar(m.texto);
+    });
+
+    acoes.appendChild(ouvir);
+    d.appendChild(acoes);
+  }
+
   chat.appendChild(d);
 }
 
@@ -194,62 +186,70 @@ function atualizarChat() {
   chat.scrollTop = chat.scrollHeight;
 }
 
-mensagens.forEach(mostrar);
-
-if (!mensagens.length) {
-  const m = {
-    texto: 'Olá! Sou o Jarvas. Minha interface está pronta; ' +
-      'minha IA ainda será instalada.',
-    eu: false
-  };
+function adicionarMensagem(m) {
   mensagens.push(m);
   mostrar(m);
-  salvar();
+  const salva = salvar();
+  atualizarChat();
+  return salva;
 }
 
 function responder(texto) {
-  const r = {
-    texto: texto,
-    eu: false
-  };
+  adicionarMensagem({texto:texto, eu:false});
 
-  mensagens.push(r);
-  mostrar(r);
-  salvar();
-  atualizarChat();
+  if (falaAutomatica) falar(texto);
+}
+
+mensagens.forEach(mostrar);
+atualizarControleVoz();
+
+if (!mensagens.length) {
+  adicionarMensagem({
+    texto:'Olá! Sou o Jarvas. Minha interface está pronta; minha IA ainda será instalada.',
+    eu:false
+  });
 }
 
 function enviar() {
   const texto = entrada.value.trim();
   if (!texto) return;
 
-  const m = {
-    texto: texto,
-    eu: true
-  };
-
-  mensagens.push(m);
-  mostrar(m);
-  salvar();
-
+  adicionarMensagem({texto:texto, eu:true});
   entrada.value = '';
 
-  responder(
-    'Recebi sua mensagem. A IA local será integrada em uma próxima etapa.'
-  );
+  responder('Recebi sua mensagem. A IA local será integrada em uma próxima etapa.');
 }
 
-document.getElementById('botaoEnviar')
-  .addEventListener('click', enviar);
+document.getElementById('botaoEnviar').addEventListener('click', enviar);
 
 entrada.addEventListener('keydown', function(e) {
   if (e.key === 'Enter') enviar();
 });
 
-document.getElementById('fotoBotao')
-  .addEventListener('click', function() {
-    arquivoFoto.click();
-  });
+botaoVoz.addEventListener('click', function() {
+  falaAutomatica = !falaAutomatica;
+
+  try {
+    localStorage.setItem('jarvas_fala_automatica', String(falaAutomatica));
+  } catch(e) {}
+
+  atualizarControleVoz();
+  definirStatus(falaAutomatica
+    ? 'Fala automática ativada.'
+    : 'Fala automática desativada.');
+
+  if (falaAutomatica) {
+    falar('Fala automática ativada.');
+  } else {
+    pararVoz();
+  }
+});
+
+document.getElementById('pararVoz').addEventListener('click', pararVoz);
+
+document.getElementById('fotoBotao').addEventListener('click', function() {
+  arquivoFoto.click();
+});
 
 function prepararImagem(file) {
   return new Promise(function(resolve, reject) {
@@ -267,32 +267,20 @@ function prepararImagem(file) {
       };
 
       imagem.onload = function() {
-        const limite = 1000;
-        const escala = Math.min(
-          1,
-          limite / Math.max(imagem.width, imagem.height)
-        );
-
-        const largura = Math.max(
-          1, Math.round(imagem.width * escala)
-        );
-        const altura = Math.max(
-          1, Math.round(imagem.height * escala)
-        );
-
+        const escala = Math.min(1, 1000 / Math.max(imagem.width, imagem.height));
+        const largura = Math.max(1, Math.round(imagem.width * escala));
+        const altura = Math.max(1, Math.round(imagem.height * escala));
         const canvas = document.createElement('canvas');
         canvas.width = largura;
         canvas.height = altura;
 
         const contexto = canvas.getContext('2d');
-
         if (!contexto) {
           reject(new Error('Não foi possível processar a imagem.'));
           return;
         }
 
         contexto.drawImage(imagem, 0, 0, largura, altura);
-
         resolve(canvas.toDataURL('image/jpeg', 0.75));
       };
 
@@ -319,48 +307,98 @@ arquivoFoto.addEventListener('change', async function() {
     selecaoFoto.style.display = 'block';
   } catch(e) {
     alert(e.message || 'Erro ao carregar a foto.');
-    fotoPendente = null;
   }
 
   arquivoFoto.value = '';
 });
 
-document.getElementById('cancelarFoto')
-  .addEventListener('click', function() {
-    fotoPendente = null;
-    previa.removeAttribute('src');
-    selecaoFoto.style.display = 'none';
+document.getElementById('cancelarFoto').addEventListener('click', function() {
+  fotoPendente = null;
+  previa.removeAttribute('src');
+  selecaoFoto.style.display = 'none';
+});
+
+document.getElementById('enviarFoto').addEventListener('click', function() {
+  if (!fotoPendente) return;
+
+  adicionarMensagem({
+    texto:'Foto enviada',
+    imagem:fotoPendente,
+    eu:true
   });
 
-document.getElementById('enviarFoto')
-  .addEventListener('click', function() {
-    if (!fotoPendente) return;
+  fotoPendente = null;
+  previa.removeAttribute('src');
+  selecaoFoto.style.display = 'none';
 
-    const m = {
-      texto: 'Foto enviada',
-      imagem: fotoPendente,
-      eu: true
-    };
+  responder('Recebi sua foto. Ainda não consigo analisar imagens, pois a IA não foi integrada.');
+});
 
-    mensagens.push(m);
-    mostrar(m);
+function iniciarReconhecimento() {
+  const SpeechRecognition = window.SpeechRecognition ||
+    window.webkitSpeechRecognition;
 
-    const salva = salvar();
+  if (!SpeechRecognition) {
+    definirStatus('Reconhecimento de fala indisponível neste ambiente. Podemos integrar o microfone nativo do Android depois.');
+    alert('Este ambiente não oferece reconhecimento de fala pelo navegador. O próximo passo será integrar o microfone nativo do Android.');
+    return;
+  }
 
-    fotoPendente = null;
-    previa.removeAttribute('src');
-    selecaoFoto.style.display = 'none';
-    atualizarChat();
+  if (ouvindo && reconhecimento) {
+    reconhecimento.stop();
+    return;
+  }
 
-    responder(
-      salva
-        ? 'Recebi sua foto. Ainda não consigo analisar imagens, ' +
-          'pois a IA não foi integrada.'
-        : 'A foto foi exibida, mas não consegui garantir que ela ' +
-          'ficou salva no histórico.'
-    );
-  });
+  reconhecimento = new SpeechRecognition();
+  reconhecimento.lang = 'pt-BR';
+  reconhecimento.continuous = false;
+  reconhecimento.interimResults = true;
+  reconhecimento.maxAlternatives = 1;
+
+  reconhecimento.onstart = function() {
+    ouvindo = true;
+    botaoMicrofone.classList.add('ativo');
+    botaoMicrofone.textContent = '⏹';
+    definirStatus('Estou ouvindo... fale agora.');
+  };
+
+  reconhecimento.onresult = function(event) {
+    let textoFinal = '';
+    let textoParcial = '';
+
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const resultado = event.results[i];
+      if (resultado.isFinal) textoFinal += resultado[0].transcript;
+      else textoParcial += resultado[0].transcript;
+    }
+
+    if (textoFinal.trim()) {
+      entrada.value = (entrada.value + ' ' + textoFinal).trim();
+      definirStatus('Fala reconhecida. Confira o texto e toque em Enviar.');
+    } else if (textoParcial) {
+      definirStatus('Entendi parcialmente: ' + textoParcial);
+    }
+  };
+
+  reconhecimento.onerror = function(event) {
+    definirStatus('Erro no reconhecimento de fala: ' + event.error);
+  };
+
+  reconhecimento.onend = function() {
+    ouvindo = false;
+    botaoMicrofone.classList.remove('ativo');
+    botaoMicrofone.textContent = '🎤';
+    if (!entrada.value.trim()) definirStatus('Jarvas pronto.');
+  };
+
+  try {
+    reconhecimento.start();
+  } catch(e) {
+    definirStatus('Não foi possível iniciar o microfone.');
+  }
+}
+
+botaoMicrofone.addEventListener('click', iniciarReconhecimento);
 </script>
-
 </body>
 </html>
