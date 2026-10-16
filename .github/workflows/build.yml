@@ -29,9 +29,11 @@ jobs:
       - name: Instalar dependencias
         run: npm install
 
+      - name: Instalar ferramentas e PDF.js
+        run: npm install --no-save @capacitor/assets sharp pdfjs-dist@4.10.38
+
       - name: Criar icone personalizado do Jarvas
         run: |
-          npm install --no-save @capacitor/assets sharp
           mkdir -p assets
 
           node --input-type=module <<'NODE'
@@ -71,10 +73,23 @@ jobs:
             .toFile('assets/icon.png');
           NODE
 
-      - name: Preparar arquivos web
+      - name: Preparar arquivos web e PDF.js
         run: |
-          mkdir -p www
+          mkdir -p www/pdfjs
+
           cp index.html www/index.html
+
+          cp node_modules/pdfjs-dist/build/pdf.mjs \
+            www/pdfjs/pdf.mjs
+
+          cp node_modules/pdfjs-dist/build/pdf.worker.mjs \
+            www/pdfjs/pdf.worker.mjs
+
+          test -s www/index.html
+          test -s www/pdfjs/pdf.mjs
+          test -s www/pdfjs/pdf.worker.mjs
+
+          echo "HTML e PDF.js preparados para uso offline."
 
       - name: Criar projeto Android
         run: npx cap add android
@@ -90,14 +105,19 @@ jobs:
       - name: Sincronizar aplicativo
         run: npx cap sync android
 
-      - name: Verificar recursos do icone
+      - name: Verificar recursos do aplicativo
         run: |
           test -f android/app/src/main/res/mipmap-hdpi/ic_launcher.png
           test -f android/app/src/main/res/mipmap-mdpi/ic_launcher.png
           test -f android/app/src/main/AndroidManifest.xml
+
           grep -q 'android:icon="@mipmap/ic_launcher"' \
             android/app/src/main/AndroidManifest.xml
-          echo "Recursos do icone encontrados."
+
+          test -s android/app/src/main/assets/public/pdfjs/pdf.mjs
+          test -s android/app/src/main/assets/public/pdfjs/pdf.worker.mjs
+
+          echo "Icones e arquivos PDF.js encontrados."
 
       - name: Compilar APK
         run: |
@@ -108,7 +128,7 @@ jobs:
       - name: Verificar APK gerado
         run: |
           APK="android/app/build/outputs/apk/debug/app-debug.apk"
-          test -f "$APK"
+          test -s "$APK"
 
           AAPT=$(find "$ANDROID_HOME/build-tools" \
             -name aapt -type f | sort -V | tail -n 1)
