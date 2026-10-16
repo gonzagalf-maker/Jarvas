@@ -131,6 +131,9 @@ footer{display:flex;gap:7px;padding:10px;border-top:1px solid #17344a}
 <input id="arquivoFoto" type="file" accept="image/*">
 <input id="arquivoPDF" type="file" accept="application/pdf,.pdf">
 
+<!-- Carrega a ponte compilada para a voz nativa -->
+<script src="./tts.js"></script>
+
 <script>
 'use strict';
 
@@ -151,12 +154,14 @@ let fotoPendente = null;
 let reconhecimento = null;
 let ouvindo = false;
 let falaAutomatica = false;
+
 let textoPDFAtual = '';
 let filaPDF = [];
 let indicePDF = 0;
 let pdfFalando = false;
 let pdfPausado = false;
 let pdfToken = 0;
+let vozToken = 0;
 
 function idNovo(){
   return Date.now().toString(36) + Math.random().toString(36).slice(2,8);
@@ -197,7 +202,6 @@ function carregarConversas(){
     conversas = [];
   }
 
-  // Migra o histórico antigo para uma conversa, sem apagar a chave antiga.
   if(!conversas.length){
     try{
       const antigas = JSON.parse(localStorage.getItem(CHAVEANTIGA) || '[]');
@@ -385,7 +389,6 @@ function enviar(){
   adicionarMensagem({texto,eu:true});
   entrada.value = '';
 
-  // Resposta provisória: ainda não existe IA conectada.
   const resposta = 'Recebi sua mensagem. A IA local ainda será integrada.';
   adicionarMensagem({texto:resposta,eu:false});
 
@@ -397,30 +400,48 @@ entrada.addEventListener('keydown',e => {
   if(e.key === 'Enter') enviar();
 });
 
-function falar(texto){
-  if(!('speechSynthesis' in window) ||
-     !('SpeechSynthesisUtterance' in window)){
-    definirStatus('A síntese de voz não está disponível neste WebView.');
+/* SÍNTESE DE VOZ NATIVA DO ANDROID */
+
+async function falar(texto){
+  if(!window.JarvasTTS ||
+     typeof window.JarvasTTS.speak !== 'function'){
+    definirStatus('Integração de voz não carregada. Confira se tts.js está no APK.');
     return;
   }
 
+  const token = ++vozToken;
+
   pararLeituraPDF();
-  window.speechSynthesis.cancel();
 
-  const fala = new SpeechSynthesisUtterance(texto);
-  fala.lang = 'pt-BR';
-  fala.rate = 1;
-  fala.pitch = 1;
+  try{
+    await window.JarvasTTS.stop();
 
-  fala.onstart = () => definirStatus('Reproduzindo voz…');
-  fala.onend = () => definirStatus('Jarvas pronto.');
-  fala.onerror = () => definirStatus('Não foi possível reproduzir a voz.');
+    if(token !== vozToken) return;
 
-  window.speechSynthesis.speak(fala);
+    definirStatus('Preparando voz…');
+
+    await window.JarvasTTS.speak(String(texto), 1);
+
+    if(token === vozToken){
+      definirStatus('Jarvas pronto.');
+    }
+  }catch(e){
+    if(token === vozToken){
+      console.error('Erro na síntese de voz:',e);
+      definirStatus('Falha na voz. Confira se há um mecanismo de síntese instalado no Android.');
+    }
+  }
 }
 
 function pararVoz(){
-  if('speechSynthesis' in window) window.speechSynthesis.cancel();
+  vozToken++;
+
+  if(window.JarvasTTS &&
+     typeof window.JarvasTTS.stop === 'function'){
+    window.JarvasTTS.stop().catch(e => {
+      console.warn('Não foi possível parar a voz:',e);
+    });
+  }
 }
 
 $('pararVoz').addEventListener('click',() => {
@@ -451,6 +472,9 @@ try{
 }catch(e){}
 
 $('vozAutomatica').classList.toggle('ativo',falaAutomatica);
+$('vozAutomatica').textContent = falaAutomatica
+  ? '🔊 Voz automática'
+  : '🔇 Voz automática';
 
 function prepararImagem(file){
   return new Promise((resolve,reject) => {
@@ -518,6 +542,9 @@ $('enviarFoto').addEventListener('click',() => {
   if(falaAutomatica) falar(resposta);
 });
 
+/* MICROFONE: permanece com a API do navegador por enquanto.
+   A integração nativa do reconhecimento será uma etapa separada. */
+
 function iniciarReconhecimento(){
   const API = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -582,8 +609,8 @@ function iniciarReconhecimento(){
 
 $('microfone').addEventListener('click',iniciarReconhecimento);
 
-// Leitura de PDF usando PDF.js empacotado localmente.
-// Requer pdfjs-dist copiado para www/pdfjs no processo de compilação.
+/* PDF.js local */
+
 $('pdfBotao').addEventListener('click',() => $('arquivoPDF').click());
 
 $('arquivoPDF').addEventListener('change',async e => {
@@ -651,43 +678,62 @@ function dividirTexto(texto,tamanho=220){
   return partes;
 }
 
-function lerProximaParte(token){
-  if(token !== pdfToken || pdfPausado) return;
+/* Leitura do PDF pela mesma voz nativa */
 
-  if(indicePDF >= filaPDF.length){
+async function lerProximaParte(token){
+  if(!window.JarvasTTS){
     pdfFalando = false;
-    definirStatus('Leitura do PDF concluída.');
+    definirStatus('Integração de voz não carregada.');
     return;
   }
 
-  const fala = new SpeechSynthesisUtterance(filaPDF[indicePDF]);
-  fala.lang = 'pt-BR';
-  fala.rate = Number($('velocidade').value);
-  fala.pitch = 1;
+  while(token === pdfToken && pdfFalando && indicePDF < filaPDF.length){
+    if(pdfPausado){
+      await new Promise(resolve => setTimeout(resolve,150));
+      continue;
+    }
 
-  fala.onend = () => {
-    if(token !== pdfToken || pdfPausado) return;
-    indicePDF++;
-    lerProximaParte(token);
-  };
+    const parte = filaPDF[indicePDF];
 
-  fala.onerror = () => {
-    if(token !== pdfToken) return;
+    try{
+      await window.JarvasTTS.speak(
+        parte,
+        Number($('velocidade').value)
+      );
+
+      if(token !== pdfToken) return;
+
+      // Se foi pausado durante a fala, repete este trecho ao retomar.
+      if(pdfPausado) continue;
+
+      indicePDF++;
+    }catch(e){
+      if(token !== pdfToken) return;
+
+      // O stop da pausa pode interromper a fala atual.
+      if(pdfPausado) continue;
+
+      console.error('Erro na leitura do PDF:',e);
+      pdfFalando = false;
+      definirStatus('Falha na voz durante a leitura do PDF.');
+      return;
+    }
+  }
+
+  if(token === pdfToken && pdfFalando && indicePDF >= filaPDF.length){
     pdfFalando = false;
-    definirStatus('A voz parou ou não está disponível.');
-  };
-
-  window.speechSynthesis.speak(fala);
+    definirStatus('Leitura do PDF concluída.');
+  }
 }
 
-$('lerPDF').addEventListener('click',() => {
+$('lerPDF').addEventListener('click',async () => {
   if(!textoPDFAtual){
     definirStatus('Abra primeiro um PDF com texto selecionável.');
     return;
   }
 
-  if(!('speechSynthesis' in window)){
-    definirStatus('Síntese de voz indisponível neste WebView.');
+  if(!window.JarvasTTS){
+    definirStatus('Integração de voz não carregada.');
     return;
   }
 
@@ -701,28 +747,25 @@ $('lerPDF').addEventListener('click',() => {
   const token = pdfToken;
 
   definirStatus('Iniciando leitura do PDF…');
-  lerProximaParte(token);
+  await lerProximaParte(token);
 });
 
-$('pausarPDF').addEventListener('click',() => {
+$('pausarPDF').addEventListener('click',async () => {
   if(!pdfFalando) return;
 
   if(!pdfPausado){
     pdfPausado = true;
-    if(window.speechSynthesis) window.speechSynthesis.pause();
-    definirStatus('Leitura pausada. Toque em Continuar para retomar.');
     $('pausarPDF').textContent = '▶ Continuar';
+
+    try{
+      await window.JarvasTTS.stop();
+    }catch(e){}
+
+    definirStatus('Leitura pausada. Toque em Continuar para retomar.');
   }else{
     pdfPausado = false;
     $('pausarPDF').textContent = '⏸ Pausar';
-
-    if(window.speechSynthesis && window.speechSynthesis.paused){
-      window.speechSynthesis.resume();
-    }else{
-      lerProximaParte(pdfToken);
-    }
-
-    definirStatus('Leitura retomada.');
+    definirStatus('Retomando leitura do PDF…');
   }
 });
 
@@ -732,9 +775,13 @@ function pararLeituraPDF(){
   pdfPausado = false;
   filaPDF = [];
   indicePDF = 0;
-
-  if(window.speechSynthesis) window.speechSynthesis.cancel();
   $('pausarPDF').textContent = '⏸ Pausar';
+
+  if(window.JarvasTTS){
+    window.JarvasTTS.stop().catch(e => {
+      console.warn('Erro ao interromper PDF:',e);
+    });
+  }
 }
 
 $('pararPDF').addEventListener('click',() => {
