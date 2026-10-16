@@ -46,8 +46,3 @@ jobs:
           name: Jarvas-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
 
-Salve com Commit changes.
-
-Esse fluxo usa o GitHub Actions para tentar gerar um APK de depuração e disponibilizá-lo para download. A compilação ainda precisa ser testada; se falhar, corrigiremos o erro indicado pelo GitHub. <Cite refs={["turn487655search0","turn487655search6"]}/>
-
-Me avise quando salvar esse arquivo. Ainda precisamos verificar se o projeto compila corretamente antes de instalar o APK.
