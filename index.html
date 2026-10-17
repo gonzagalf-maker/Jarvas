@@ -192,7 +192,6 @@ let pdfFalando = false;
 let pdfPausado = false;
 let pdfToken = 0;
 let vozToken = 0;
-
 let paginasFavoritas = [];
 
 function idNovo(){
@@ -230,7 +229,17 @@ function carregarConversas(){
   }catch(e){ conversas = []; }
 
   if(!conversas.length){
-    conversas = [{id:idNovo(), mensagens:[{texto:'Olá! Sou o Jarvas.', eu:false}], criada:Date.now()}];
+    try{
+      const antigas = JSON.parse(localStorage.getItem(CHAVEANTIGA) || '[]');
+      if(Array.isArray(antigas) && antigas.length){
+        conversas = [{id:idNovo(), mensagens:antigas, criada:Date.now()}];
+        salvarConversas();
+      }
+    }catch(e){}
+  }
+
+  if(!conversas.length){
+    conversas = [{id:idNovo(), mensagens:[{texto:'Olá! Sou o Jarvas. Minha interface está pronta.', eu:false}], criada:Date.now()}];
     salvarConversas();
   }
   conversaAtual = conversas[conversas.length - 1].id;
@@ -245,7 +254,7 @@ function renderizarLista(){
 
     const selecionar = document.createElement('button');
     selecionar.type = 'button';
-    selecionar.className = 'selecionarConversa' + (c.id === conversaAtual ? ' ativa' : '');
+    selecionar.className = 'selejonarConversa selecionarConversa' + (c.id === conversaAtual ? ' ativa' : '');
     selecionar.textContent = rotulo;
     selecionar.addEventListener('click', () => abrirConversa(c.id));
 
@@ -296,7 +305,37 @@ function adicionarMensagem(m){
 function abrirConversa(id){
   conversaAtual = id;
   renderizarChat();
+  if(window.innerWidth <= 600) lateral.classList.add('fechada');
 }
+
+function novaConversa(){
+  const c = {id:idNovo(), mensagens:[], criada:Date.now()};
+  conversas.push(c);
+  conversaAtual = c.id;
+  salvarConversas();
+  renderizarChat();
+  if(window.innerWidth <= 600) lateral.classList.add('fechada');
+}
+
+function excluirConversa(id){
+  conversas = conversas.filter(x => x.id !== id);
+  if(!conversas.length) conversas.push({id:idNovo(), mensagens:[], criada:Date.now()});
+  if(conversaAtual === id) conversaAtual = conversas[conversas.length - 1].id;
+  salvarConversas();
+  renderizarChat();
+}
+
+$('nova').addEventListener('click', novaConversa);$('limparHistorico').addEventListener('click', () => {
+  if(!confirm('Limpar todas as conversas?')) return;
+  conversas = [{id:idNovo(), mensagens:[], criada:Date.now()}];
+  conversaAtual = conversas[0].id;
+  salvarConversas();
+  renderizarChat();
+});
+
+$('menu').addEventListener('click', () => {
+  lateral.classList.toggle('fechada');
+});
 
 async function responder(texto){
   if(window.JarvasIA && typeof window.JarvasIA.gerar === 'function'){
@@ -330,32 +369,8 @@ entrada.addEventListener('keydown', e => { if(e.key === 'Enter') enviar(); });
    ============================================================ */
 let pdfPaginas = [];
 let pdfInicio = {pagina:0, item:0};
-let filaPaginas = [];
-let filaPDFInfo = [];
-let ultimaPaginaRolada = -1;
 let observadorPDF = null;
 let pdfDocAtual = null;
-
-function montarTextoPagina(itens){
-  let texto = '';
-  let ultimo = null;
-  for(const item of itens){
-    const str = item.str || '';
-    const t = item.transform || [];
-    const x = t[4], y = t[5];
-    const tamanho = Math.abs(t[0]) || item.height || 10;
-    if(ultimo && typeof x === 'number' && typeof y === 'number'){
-      if(Math.abs(y - ultimo.y) > tamanho * 0.5){
-        if(!/\s$/.test(texto)) texto += ' ';
-      }
-    }
-    texto += str;
-    if(typeof x === 'number' && typeof y === 'number') ultimo = {fim:x + (item.width || 0), y};
-  }
-  return texto.replace(/[ \t]+/g,' ').trim();
-}
-
-$('pdfBotao').addEventListener('click', () =>$('arquivoPDF').click());
 
 function limparVisorPDF(){
   if(observadorPDF) observadorPDF.disconnect();
@@ -435,6 +450,8 @@ $('verFavoritos').addEventListener('click', () => {
   painel.style.display = painel.style.display === 'block' ? 'none' : 'block';
 });
 
+$('pdfBotao').addEventListener('click', () =>$('arquivoPDF').click());
+
 $('arquivoPDF').addEventListener('change', async e => {
   const file = e.target.files[0];
   e.target.value = '';
@@ -449,4 +466,61 @@ $('arquivoPDF').addEventListener('change', async e => {
     pdfjs.GlobalWorkerOptions.workerSrc = './pdfjs/pdf.worker.mjs';
 
     const buffer = await file.arrayBuffer();
-    const pdf = await pdfjs.getDocument({data:new
+    const pdf = await pdfjs.getDocument({data:new Uint8Array(buffer)}).promise;
+    pdfDocAtual = pdf;
+
+    const visor = $('visorPDF');
+    const largura = Math.max(200, visor.clientWidth - 14);
+
+    observadorPDF = new IntersectionObserver(entradas => {
+      entradas.forEach(en => {
+        const pg = en.target._pg;
+        if(!pg) return;
+        pg.visivel = en.isIntersecting;
+        if(en.isIntersecting) renderizarPaginaPDF(pg);
+      });
+    },{root:visor, rootMargin:'700px 0px'});
+
+    for(let n = 1; n <= pdf.numPages; n++){
+      const pagina = await pdf.getPage(n);
+      const base = pagina.getViewport({scale:1});
+      const viewport = pagina.getViewport({scale:largura / base.width});
+      const conteudo = await pagina.getTextContent();
+
+      const div = document.createElement('div');
+      div.className = 'paginaPDF';
+      div.style.width = Math.floor(viewport.width) + 'px';
+      div.style.height = Math.floor(viewport.height) + 'px';
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 1; canvas.height = 1;
+      div.appendChild(canvas);
+      visor.appendChild(div);
+
+      const pg = {numero:n, pagina, itens:conteudo.items, viewport, div, canvas, renderizada:false};
+      div._pg = pg;
+      pdfPaginas.push(pg);
+      observadorPDF.observe(div);
+    }
+    $('textoPDF').textContent = 'PDF carregado com sucesso.';
+    definirStatus('PDF carregado.');
+  }catch(err){
+    $('textoPDF').textContent = 'Erro ao abrir PDF.';
+  }
+});
+
+async function renderizarPaginaPDF(pg){
+  if(pg.renderizada) return;
+  try{
+    const ctx = pg.canvas.getContext('2d');
+    pg.canvas.width = pg.viewport.width;
+    pg.canvas.height = pg.viewport.height;
+    await pg.pagina.render({canvasContext:ctx, viewport:pg.viewport}).promise;
+    pg.renderizada = true;
+  }catch(e){}
+}
+
+$('irBotao').addEventListener('click', () => {
+  let n = parseInt($('irPagina').value, 10);
+  if(!n || n < 1) n = 1;
+  if(n > pdfPaginas.length) n = pdfPaginas.length
