@@ -219,7 +219,6 @@ function salvarConversas(){
     localStorage.setItem(CHAVECONVERSAS, JSON.stringify(conversas));
     return true;
   }catch(e){
-    // Armazenamento cheio: remove fotos das mensagens mais antigas, uma a uma, e tenta de novo.
     for(const c of conversas){
       for(const m of c.mensagens){
         if(!m.imagem) continue;
@@ -381,7 +380,6 @@ function mostrar(m){
     d.appendChild(fonte);
   }
 
-  // Qualquer mensagem pode ser ouvida de novo pela voz.
   if(m.texto){
     const acoes = document.createElement('div');
     acoes.className = 'msgAudio';
@@ -474,8 +472,6 @@ $('menu').addEventListener('click',() => {
 
 /* ============================================================
    CÉREBRO DO JARVAS
-   Quando a IA local for integrada, só esta função muda.
-   Se existir window.JarvasIA.gerar({prompt}), ela é usada.
    ============================================================ */
 async function responder(texto){
   if(window.JarvasIA && typeof window.JarvasIA.gerar === 'function'){
@@ -486,11 +482,8 @@ async function responder(texto){
 }
 
 /* ============================================================
-   PESQUISA NA WEB (Wikipédia, em português)
-   Precisa de internet. Funciona por texto ou por voz:
-   "pesquisar sobre ...", "busque ...", "procure ...".
+   PESQUISA NA WEB
    ============================================================ */
-
 function extrairPesquisa(texto){
   const m = texto.trim().match(
     /^(?:pesquisar|pesquise|pesquisa|buscar|busque|procurar|procure)\s+(?:na\s+(?:internet|web|wikipedia|wikipédia)\s+)?(?:por\s+|sobre\s+)?(.+)$/i
@@ -559,7 +552,6 @@ $('pesquisarWeb').addEventListener('click',() => {
   enviarTexto('pesquisar ' + consulta);
 });
 
-/* Fluxo único de envio: usado pelo teclado e pelo modo conversa. */
 async function enviarTexto(texto,opcoes){
   const aguardarFala = !!(opcoes && opcoes.aguardarFala);
 
@@ -625,16 +617,13 @@ async function falar(texto){
   }
 
   const token = ++vozToken;
-
   pararLeituraPDF();
 
   try{
     await window.JarvasTTS.stop();
-
     if(token !== vozToken) return;
 
     definirStatus('Falando…');
-
     await window.JarvasTTS.speak(String(texto), 1);
 
     if(token === vozToken && !modoConversa){
@@ -643,19 +632,15 @@ async function falar(texto){
   }catch(e){
     if(token === vozToken){
       console.error('Erro na síntese de voz:',e);
-      definirStatus('Falha na voz. Confira se há um mecanismo de síntese instalado no Android.');
+      definirStatus('Falha na voz.');
     }
   }
 }
 
 function pararVoz(){
   vozToken++;
-
-  if(window.JarvasTTS &&
-     typeof window.JarvasTTS.stop === 'function'){
-    window.JarvasTTS.stop().catch(e => {
-      console.warn('Não foi possível parar a voz:',e);
-    });
+  if(window.JarvasTTS && typeof window.JarvasTTS.stop === 'function'){
+    window.JarvasTTS.stop().catch(e => {});
   }
 }
 
@@ -681,22 +666,17 @@ $('ouvirUltima').addEventListener('click',() => {
 });
 
 function atualizarBotaoVozAutomatica(){
-  $('vozAutomatica').textContent = falaAutomatica
-    ? '🔊 Voz automática'
-    : '🔇 Voz automática';
+  $('vozAutomatica').textContent = falaAutomatica ? '🔊 Voz automática' : '🔇 Voz automática';
   $('vozAutomatica').classList.toggle('ativo',falaAutomatica);
 }
 
 $('vozAutomatica').addEventListener('click',() => {
   falaAutomatica = !falaAutomatica;
-
   try{
     localStorage.setItem('jarvas_fala_automatica',String(falaAutomatica));
   }catch(e){}
-
   atualizarBotaoVozAutomatica();
   definirStatus(falaAutomatica ? 'Voz automática ativada.' : 'Voz automática desativada.');
-
   if(!falaAutomatica && !modoConversa) pararVoz();
 });
 
@@ -708,34 +688,25 @@ atualizarBotaoVozAutomatica();
 /* ============================================================
    FOTO
    ============================================================ */
-
 function prepararImagem(file){
   return new Promise((resolve,reject) => {
     const leitor = new FileReader();
-
     leitor.onerror = () => reject(new Error('Não foi possível ler a imagem.'));
-
     leitor.onload = () => {
       const imagem = new Image();
-
       imagem.onerror = () => reject(new Error('Não foi possível abrir a imagem.'));
-
       imagem.onload = () => {
         const escala = Math.min(1,1000 / Math.max(imagem.width,imagem.height));
         const canvas = document.createElement('canvas');
         canvas.width = Math.max(1,Math.round(imagem.width * escala));
         canvas.height = Math.max(1,Math.round(imagem.height * escala));
-
         const contexto = canvas.getContext('2d');
         if(!contexto) return reject(new Error('Falha ao processar imagem.'));
-
         contexto.drawImage(imagem,0,0,canvas.width,canvas.height);
         resolve(canvas.toDataURL('image/jpeg',0.72));
       };
-
       imagem.src = leitor.result;
     };
-
     leitor.readAsDataURL(file);
   });
 }
@@ -776,15 +747,11 @@ $('enviarFoto').addEventListener('click',() => {
 });
 
 /* ============================================================
-   MICROFONE (reconhecimento de fala)
-   Ordem de preferência:
-   1) plugin nativo do Capacitor (@capacitor-community/speech-recognition)
-   2) API de fala do navegador, se o WebView tiver
+   MICROFONE
    ============================================================ */
-
-let backendEscuta;      // undefined = ainda não verificado | 'nativo' | 'web' | null
+let backendEscuta;
 let SRNativo = null;
-let escutaAtual = null; // { parar: função } enquanto estiver ouvindo
+let escutaAtual = null;
 
 async function detectarBackend(){
   if(backendEscuta !== undefined) return backendEscuta;
@@ -812,19 +779,13 @@ async function detectarBackend(){
 
 function avisoSemMicrofone(){
   definirStatus('Microfone indisponível neste app.');
-  alert(
-    'O reconhecimento de fala não está disponível neste WebView.\n\n' +
-    'Para ativar o microfone, instale o plugin nativo e gere o APK de novo:\n' +
-    'npm install @capacitor-community/speech-recognition\n' +
-    'npx cap sync'
-  );
+  alert('O reconhecimento de fala não está disponível neste WebView.');
 }
 
 function pararEscuta(){
   if(escutaAtual) escutaAtual.parar();
 }
 
-/* Ouve uma frase e devolve { texto, erro }. */
 async function ouvirUmaVez(){
   const backend = await detectarBackend();
 
@@ -849,9 +810,7 @@ async function ouvirUmaVez(){
 
       try{
         const perm = await SRNativo.requestPermissions();
-        if(!perm || perm.speechRecognition !== 'granted'){
-          return finalizar('permissao');
-        }
+        if(!perm || perm.speechRecognition !== 'granted') return finalizar('permissao');
 
         ouvinte = await SRNativo.addListener('partialResults',dados => {
           const t = dados && dados.matches && dados.matches[0];
@@ -865,12 +824,7 @@ async function ouvirUmaVez(){
         escutaAtual = {parar:() => finalizar()};
         timerLimite = setTimeout(() => finalizar(),15000);
 
-        await SRNativo.start({
-          language:'pt-BR',
-          maxResults:1,
-          partialResults:true,
-          popup:false
-        });
+        await SRNativo.start({language:'pt-BR',maxResults:1,partialResults:true,popup:false});
       }catch(e){
         finalizar('falha');
       }
@@ -900,7 +854,6 @@ async function ouvirUmaVez(){
       };
 
       rec.onerror = event => { erro = event.error || 'falha'; };
-
       rec.onend = () => {
         escutaAtual = null;
         resolve({texto:(final || parcial).trim(),erro});
@@ -920,13 +873,11 @@ async function ouvirUmaVez(){
   return {texto:'',erro:'indisponivel'};
 }
 
-/* Botão 🎤: ouve uma frase e coloca no campo de texto para você conferir. */
 $('microfone').addEventListener('click',async () => {
   if(modoConversa){
-    definirStatus('O modo conversa já está ouvindo. Desligue-o para usar o microfone avulso.');
+    definirStatus('O modo conversa já está ouvindo.');
     return;
   }
-
   if(escutaAtual){
     pararEscuta();
     return;
@@ -952,26 +903,19 @@ $('microfone').addEventListener('click',async () => {
 
   if(r.texto){
     entrada.value = (entrada.value + ' ' + r.texto).trim();
-    definirStatus('Texto reconhecido. Confira antes de enviar.');
+    definirStatus('Texto reconhecido.');
   }else if(r.erro && r.erro !== 'no-speech' && r.erro !== 'aborted'){
     definirStatus('Erro no microfone: ' + r.erro);
   }else{
-    definirStatus('Não ouvi nada. Toque em Falar e tente de novo.');
+    definirStatus('Não ouvi nada.');
   }
 });
 
 /* ============================================================
-   MODO CONVERSA (mãos livres)
-   Ouve → envia → responde por voz → volta a ouvir, sem tocar em botões.
-   Diga "parar" para sair.
+   MODO CONVERSA
    ============================================================ */
-
 function ehComandoParar(texto){
-  const t = texto
-    .toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-    .replace(/[^a-z ]/g,'')
-    .trim();
+  const t = texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z ]/g,'').trim();
   return /^(parar|pare|encerrar|encerra|desligar|sair|tchau|pode parar)( modo conversa| conversa)?$/.test(t);
 }
 
@@ -993,7 +937,7 @@ async function ligarModoConversa(){
     if(navigator.wakeLock) wakeLock = await navigator.wakeLock.request('screen');
   }catch(e){}
 
-  definirStatus('Modo conversa ligado. Fale quando quiser; diga "parar" para sair.');
+  definirStatus('Modo conversa ligado. Diga "parar" para sair.');
   cicloConversa();
 }
 
@@ -1013,27 +957,20 @@ function desligarModoConversa(mensagem){
 
 async function cicloConversa(){
   let falhas = 0;
-
   while(modoConversa){
     if(enviando){
       await esperar(300);
       continue;
     }
-
     definirStatus('Estou ouvindo…');
     const r = await ouvirUmaVez();
     if(!modoConversa) break;
-
-    if(r.erro === 'permissao' || r.erro === 'not-allowed' || r.erro === 'service-not-allowed'){
-      desligarModoConversa('Sem permissão do microfone. Libere nas configurações do app.');
-      break;
-    }
 
     if(!r.texto){
       if(r.erro && r.erro !== 'no-speech' && r.erro !== 'aborted'){
         falhas++;
         if(falhas >= 3){
-          desligarModoConversa('O microfone falhou várias vezes. Modo conversa desligado.');
+          desligarModoConversa('O microfone falhou várias vezes.');
           break;
         }
       }
@@ -1042,15 +979,12 @@ async function cicloConversa(){
     }
 
     falhas = 0;
-
     if(ehComandoParar(r.texto)){
       desligarModoConversa('Modo conversa desligado por voz.');
       break;
     }
 
     await enviarTexto(r.texto,{aguardarFala:true});
-
-    // Pequena pausa para o eco da voz não ser captado pelo microfone.
     await esperar(500);
   }
 }
@@ -1060,7 +994,6 @@ $('modoConversa').addEventListener('click',() => {
   else ligarModoConversa();
 });
 
-// Se o app for para segundo plano, o microfone para: desliga o modo para não ficar preso.
 document.addEventListener('visibilitychange',() => {
   if(document.hidden && modoConversa){
     desligarModoConversa('Modo conversa desligado porque o app saiu da tela.');
@@ -1068,12 +1001,8 @@ document.addEventListener('visibilitychange',() => {
 });
 
 /* ============================================================
-   LEITOR DE PDF (PDF.js local)
+   LEITOR DE PDF
    ============================================================ */
-
-/* Monta o texto da página usando a posição de cada pedaço.
-   Só põe espaço onde há espaço de verdade, para a palavra não sair
-   com as letras separadas ("A l t r a s"). */
 function montarTextoPagina(itens){
   let texto = '';
   let ultimo = null;
@@ -1110,7 +1039,6 @@ function montarTextoPagina(itens){
   return corrigirLetrasSeparadas(texto).replace(/[ \t]+/g,' ').trim();
 }
 
-/* Junta palavras que vieram com as letras separadas por espaço (PDFs com texto espaçado). */
 function corrigirLetrasSeparadas(texto){
   return texto.replace(
     /(?<![\p{L}\p{N}])(?:[\p{L}\p{N}] ){3,}[\p{L}\p{N}](?![\p{L}\p{N}])/gu,
@@ -1119,11 +1047,6 @@ function corrigirLetrasSeparadas(texto){
 }
 
 $('pdfBotao').addEventListener('click',() => $('arquivoPDF').click());
-
-/* ------------------------------------------------------------
-   Visor do PDF: mostra as páginas como imagem.
-   Toque num ponto da página para começar a ler dali.
-   ------------------------------------------------------------ */
 
 let pdfPaginas = [];
 let pdfInicio = {pagina:0,item:0};
@@ -1176,7 +1099,6 @@ async function renderizarPaginaPDF(pg){
     await pg.tarefa.promise;
     pg.renderizada = true;
   }catch(e){
-    // Renderização cancelada ao sair da tela: é normal.
   }finally{
     pg.renderizando = false;
     pg.tarefa = null;
@@ -1188,7 +1110,6 @@ function liberarPaginaPDF(pg){
   if(pg.tarefa){
     try{ pg.tarefa.cancel(); }catch(e){}
   }
-
   if(pg.renderizada){
     pg.canvas.width = 1;
     pg.canvas.height = 1;
@@ -1215,7 +1136,6 @@ function rolarParaPagina(i){
   $('visorPDF').scrollTo({top:Math.max(0,pg.div.offsetTop - 4),behavior:'smooth'});
 }
 
-/* Descobre qual trecho de texto está mais perto do toque e define ali o início da leitura. */
 function escolherInicio(pg,ev){
   const rect = pg.canvas.getBoundingClientRect();
   if(!rect.width || !rect.height) return;
@@ -1261,7 +1181,7 @@ function escolherInicio(pg,ev){
   if(pdfFalando){
     iniciarLeituraPDF();
   }else{
-    definirStatus('Começa na página ' + pg.numero + '. Toque em Ler PDF.');
+    definirStatus('Ponto de leitura definido na página ' + pg.numero + '. Toque em Ler PDF.');
   }
 }
 
@@ -1340,19 +1260,16 @@ $('arquivoPDF').addEventListener('change',async e => {
     $('irPagina').max = String(pdf.numPages);
 
     if(!textoPDFAtual){
-      $('textoPDF').textContent =
-        'Não encontrei texto selecionável. Este PDF pode ser digitalizado como imagem; para ouvir seria necessário OCR. Você ainda pode ver as páginas abaixo.';
+      $('textoPDF').textContent = 'PDF sem texto extraível.';
       definirStatus('PDF sem texto extraível.');
       return;
     }
 
-    $('textoPDF').textContent =
-      'Toque no ponto do PDF onde quer começar a ler, ou digite o número da página e toque em Ir. Depois toque em Ler PDF.';
+    $('textoPDF').textContent = 'Toque no PDF onde quer começar, ou digite a página e toque em Ir. Depois toque em Ler PDF.';
     definirStatus('PDF carregado: ' + pdf.numPages + ' página(s).');
   }catch(err){
     console.error(err);
-    $('textoPDF').textContent =
-      'Não foi possível abrir o PDF. Verifique se a biblioteca PDF.js foi incluída no APK e tente novamente.';
+    $('textoPDF').textContent = 'Não foi possível abrir o PDF.';
     definirStatus('Falha ao abrir o PDF.');
   }
 });
@@ -1372,13 +1289,9 @@ $('irBotao').addEventListener('click',() => {
   if(pdfFalando){
     iniciarLeituraPDF();
   }else{
-    definirStatus('Começa na página ' + n + '. Toque em Ler PDF.');
+    definirStatus('Leitura direcionada para a página ' + n + '. Toque em Ler PDF.');
   }
 });
-
-/* ------------------------------------------------------------
-   Pesquisa dentro do PDF: lista onde o termo aparece e leva até lá.
-   ------------------------------------------------------------ */
 
 function irParaItem(pg,indice){
   const item = pg.itens[indice];
@@ -1398,7 +1311,7 @@ function irParaItem(pg,indice){
   });
 
   if(pdfFalando) iniciarLeituraPDF();
-  else definirStatus('Começa na página ' + pg.numero + '. Toque em Ler PDF.');
+  else definirStatus('Ponto de início ajustado na página ' + pg.numero + '. Toque em Ler PDF.');
 }
 
 function buscarNoPDF(){
@@ -1457,9 +1370,7 @@ function buscarNoPDF(){
     caixa.appendChild(vazio);
     definirStatus('Nada encontrado no PDF.');
   }else{
-    definirStatus(total >= LIMITE
-      ? 'Mostrando os primeiros ' + LIMITE + ' resultados. Toque em um para ir até ele.'
-      : total + ' resultado(s). Toque em um para ir até ele.');
+    definirStatus(total >= LIMITE ? 'Primeiros ' + LIMITE + ' resultados.' : total + ' resultado(s). Toque para ir até ele.');
   }
 }
 
@@ -1486,8 +1397,6 @@ function dividirTexto(texto,tamanho=220){
   return partes;
 }
 
-/* Leitura do PDF pela mesma voz nativa */
-
 async function lerProximaParte(token){
   if(!window.JarvasTTS){
     pdfFalando = false;
@@ -1502,32 +1411,26 @@ async function lerProximaParte(token){
     }
 
     const parte = filaPDF[indicePDF];
-
     const paginaDaParte = filaPaginas[indicePDF];
+
     if(paginaDaParte !== undefined && paginaDaParte !== ultimaPaginaRolada){
       ultimaPaginaRolada = paginaDaParte;
       rolarParaPagina(paginaDaParte);
     }
 
     try{
-      await window.JarvasTTS.speak(
-        parte,
-        Number($('velocidade').value)
-      );
-
+      await window.JarvasTTS.speak(parte, Number($('velocidade').value));
       if(token !== pdfToken) return;
-
-      // Se foi pausado durante a fala, repete este trecho ao retomar.
       if(pdfPausado) continue;
 
       indicePDF++;
+      // Atualiza o ponteiro de início global conforme a leitura progride
+      if(filaPDFInfo && filaPDFInfo[indicePDF]){
+        pdfInicio = filaPDFInfo[indicePDF];
+      }
     }catch(e){
       if(token !== pdfToken) return;
-
-      // O stop da pausa pode interromper a fala atual.
       if(pdfPausado) continue;
-
-      console.error('Erro na leitura do PDF:',e);
       pdfFalando = false;
       definirStatus('Falha na voz durante a leitura do PDF.');
       return;
@@ -1540,25 +1443,34 @@ async function lerProximaParte(token){
   }
 }
 
+let filaPDFInfo = [];
+
 function montarFilaPDF(){
   const fila = [];
   const paginas = [];
+  const info = [];
 
   for(let p = pdfInicio.pagina;p < pdfPaginas.length;p++){
     const pg = pdfPaginas[p];
-    const itens = (p === pdfInicio.pagina) ? pg.itens.slice(pdfInicio.item) : pg.itens;
-    let texto = montarTextoPagina(itens);
-    if(!texto) continue;
+    const itemInicio = (p === pdfInicio.pagina) ? pdfInicio.item : 0;
+    
+    // Processa bloco a bloco a partir do item selecionado
+    for(let k = itemInicio; k < pg.itens.length; k++){
+      const item = pg.itens[k];
+      if(!item || !item.str || !item.str.trim()) continue;
 
-    texto = 'Página ' + pg.numero + '. ' + texto;
+      const textoItem = montarTextoPagina([item]);
+      if(!textoItem) continue;
 
-    for(const parte of dividirTexto(texto)){
-      fila.push(parte);
-      paginas.push(p);
+      for(const parte of dividirTexto(textoItem)){
+        fila.push(parte);
+        paginas.push(p);
+        info.push({pagina:p, item:k});
+      }
     }
   }
 
-  return {fila,paginas};
+  return {fila,paginas,info};
 }
 
 async function iniciarLeituraPDF(){
@@ -1575,7 +1487,6 @@ async function iniciarLeituraPDF(){
   if(modoConversa) desligarModoConversa('Modo conversa desligado para ler o PDF.');
 
   pararVoz();
-  pararLeituraPDF();
 
   const montada = montarFilaPDF();
   if(!montada.fila.length){
@@ -1585,13 +1496,14 @@ async function iniciarLeituraPDF(){
 
   filaPDF = montada.fila;
   filaPaginas = montada.paginas;
+  filaPDFInfo = montada.info;
   indicePDF = 0;
   ultimaPaginaRolada = -1;
   pdfFalando = true;
   pdfPausado = false;
-  const token = pdfToken;
+  const token = ++pdfToken;
 
-  definirStatus('Iniciando leitura do PDF…');
+  definirStatus('Lendo PDF a partir da página ' + (pdfInicio.pagina + 1) + '…');
   await lerProximaParte(token);
 }
 
@@ -1603,11 +1515,9 @@ $('pausarPDF').addEventListener('click',async () => {
   if(!pdfPausado){
     pdfPausado = true;
     $('pausarPDF').textContent = '▶ Continuar';
-
     try{
       await window.JarvasTTS.stop();
     }catch(e){}
-
     definirStatus('Leitura pausada. Toque em Continuar para retomar.');
   }else{
     pdfPausado = false;
@@ -1622,13 +1532,12 @@ function pararLeituraPDF(){
   pdfPausado = false;
   filaPDF = [];
   filaPaginas = [];
+  filaPDFInfo = [];
   indicePDF = 0;
   $('pausarPDF').textContent = '⏸ Pausar';
 
   if(window.JarvasTTS){
-    window.JarvasTTS.stop().catch(e => {
-      console.warn('Erro ao interromper PDF:',e);
-    });
+    window.JarvasTTS.stop().catch(e => {});
   }
 }
 
@@ -1637,7 +1546,6 @@ $('pararPDF').addEventListener('click',() => {
   definirStatus('Leitura do PDF interrompida.');
 });
 
-/* Recolhe o painel do PDF (o PDF continua carregado e a leitura não é interrompida). */
 function recolherPDF(){
   if($('painelPDF').style.display !== 'block') return;
   $('painelPDF').style.display = 'none';
@@ -1660,18 +1568,15 @@ $('fecharPDF').addEventListener('click',() => {
   $('mostrarPDF').style.display = 'none';
 });
 
-// Voltou para o chat: recolhe o PDF automaticamente.
 entrada.addEventListener('focus',recolherPDF);
 chat.addEventListener('click',recolherPDF);
 
 /* ============================================================
    INÍCIO
    ============================================================ */
-
 carregarConversas();
 renderizarChat();
 
-// No celular, começa com o menu lateral fechado para não cobrir o chat.
 if(window.innerWidth <= 600) lateral.classList.add('fechada');
 </script>
 </body>
